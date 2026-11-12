@@ -16,6 +16,8 @@ const NO_NAMES = (s) => s && !/francisco|manuel/i.test(s);
 // 1. Refacción completa CC450 -> canaliza, sin precio, sin placa, sin nombres
 let c = conv();
 let r = say(c, 'Hola, necesito un compresor para un Spheros CC450');
+check('refacción sin nombre pide el nombre', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'Juan Pérez');
 check('refacción pide equipo ya dado -> canaliza', !!r.solicitud && r.close, JSON.stringify(r));
 check('mensaje de canalización sin nombres', NO_NAMES(r.reply), r.reply);
 check('mensaje de canalización sin precio', NO_PRICE(r.reply), r.reply);
@@ -33,16 +35,22 @@ c = conv();
 r = say(c, 'Necesito un presostato');
 check('presostato ambiguo pregunta baja/alta', r.reply && r.reply.includes('BAJA') && r.reply.includes('ALTA'), r.reply);
 r = say(c, 'el de baja, cable azul');
+check('presostato baja pide nombre (número no registrado)', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'soy Juan Pérez');
 check('presostato baja ya clara canaliza directo sin pedir equipo', !!r.solicitud && r.close, JSON.stringify(r));
 
 // 4. Código solo -> reconoce TM65 y canaliza directo sin pedir equipo
 c = conv();
 r = say(c, 'T95177AY');
+check('código T95177AY pide nombre (número no registrado)', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'María López');
 check('código T95177AY reconocido y canaliza sin pedir equipo', !!r.solicitud && r.close, JSON.stringify(r));
 
 // 4b. Compresor TM65 por nombre -> canaliza directo sin pedir equipo
 c = conv();
 r = say(c, 'Buenas tardes maneja compresor tm65,');
+check('compresor TM65 pide nombre', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'Pedro Gómez');
 check('compresor TM65 por nombre canaliza sin pedir equipo', !!r.solicitud && r.close, JSON.stringify(r));
 
 // 5. Filtro 304 ambiguo
@@ -73,6 +81,7 @@ check('proveedor se canaliza sin compromiso de compra', !!r.solicitud && r.close
 // 9. Conversación cerrada + "gracias" -> no duplica solicitud
 c = conv();
 say(c, 'compresor TM65 para CC450');
+say(c, 'Juan Pérez');
 r = say(c, 'muchas gracias, es todo');
 check('gracias tras cerrar no crea solicitud', !r.solicitud, JSON.stringify(r));
 r = say(c, 'ahora ocupo un filtro 305 flare para CC450');

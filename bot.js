@@ -154,7 +154,10 @@ function handleMessage(conv, msg) {
     if (isFarewell(text) && !hasPhoto) {
       return { reply: 'Con gusto, quedamos al pendiente.', solicitud: null, close: true };
     }
+    // Al reabrir, se conservan el nombre (número ya registrado) y nada más.
+    const nombreRegistrado = conv.fields.nombre;
     conv.cerrada = false; conv.cerradaAt = null; conv.intent = null; conv.fields = {};
+    if (nombreRegistrado) conv.fields.nombre = nombreRegistrado;
   }
   if (!text && !hasPhoto) return { reply: null, solicitud: null, close: false };
 
@@ -165,6 +168,15 @@ function handleMessage(conv, msg) {
   if (hasPhoto) {
     f.foto = msg.imageId;
     if (conv.intent === 'refaccion' && !f.refaccion) f.refaccion = 'foto de la pieza';
+  }
+
+  // Si se le pidió el nombre (número no registrado) y el cliente contestó,
+  // esa respuesta es su nombre, aunque venga sin "soy / me llamo".
+  if (f._pideNombre && text) {
+    const t = text.replace(/^(soy|me llamo|mi nombre es|es)\s+/i, '').trim();
+    if (/^[A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-Za-zÁÉÍÓÚÑáéíóúñ]+){0,3}$/.test(t) && t.length >= 3) {
+      f.nombre = t; delete f._pideNombre;
+    }
   }
 
   // Extraer equipo y refacción del texto
@@ -225,7 +237,7 @@ function handleMessage(conv, msg) {
 
   // --- Estatus: pedir localizadores (nunca placa) y contestar por la nota
   if (conv.intent === 'estatus') {
-    if (!f.nombre) return { reply: 'Claro, ¿me dice su nombre y la empresa, ruta, número de camión o chasis de la unidad para localizarla?', solicitud: null, close: false };
+    if (!f.nombre) { f._pideNombre = true; return { reply: 'Claro, ¿me dice su nombre y la empresa, ruta, número de camión o chasis de la unidad para localizarla?', solicitud: null, close: false }; }
     if (!f.empresa && !f.ruta && !f.numeroUnidad && !f.chasis) {
       return { reply: 'Gracias, ' + f.nombre + '. ¿Me pasa la empresa, la ruta, el número de camión o el chasis de la unidad?', solicitud: null, close: false };
     }
@@ -235,7 +247,7 @@ function handleMessage(conv, msg) {
   // --- Servicio / reparación / instalación
   if (conv.intent === 'servicio') {
     if (!f.equipo) return { reply: 'Claro, ¿para qué equipo es? Valeo, Spheros CC450, CC355 o Eberspächer, o si gusta mándeme una foto.', solicitud: null, close: false };
-    if (!f.nombre) return { reply: '¿Me dice su nombre para registrar la solicitud de servicio para el ' + f.equipo + '?', solicitud: null, close: false };
+    if (!f.nombre) { f._pideNombre = true; return { reply: '¿Me dice su nombre para registrar la solicitud de servicio para el ' + f.equipo + '?', solicitud: null, close: false }; }
     const sol = buildSolicitud(conv, 'servicio', (f.nombre ? f.nombre + ' — servicio para ' : 'Servicio para ') + f.equipo + (f.falla ? ': ' + f.falla : ''));
     return fin(conv, { reply: CANALIZAR_MSG, solicitud: sol, close: true });
   }
@@ -261,6 +273,12 @@ function handleMessage(conv, msg) {
   // Foto sin datos de la pieza: ahí sí se pregunta el equipo.
   if (f.refaccion === 'foto de la pieza' && !f.equipo) {
     return { reply: 'Ya recibí la foto. ¿Para qué equipo es la pieza? Valeo, Spheros CC450, CC355 o Eberspächer.', solicitud: null, close: false };
+  }
+  // Número no registrado (sin nombre): pedir el nombre del cliente antes
+  // de canalizar, para que la solicitud llegue con quién la pide.
+  if (!f.nombre) {
+    f._pideNombre = true;
+    return { reply: 'Claro, con gusto tomo su solicitud de ' + (f.refaccion || 'la refacción') + (f.equipo ? ' para ' + f.equipo : '') + '. ¿Me dice su nombre para registrarla?', solicitud: null, close: false };
   }
   // Regla del usuario 2026-11-12: si la refacción ya quedó clara (nombre o
   // código reconocido, p. ej. compresor TM65), NO se pide el equipo: se
