@@ -66,15 +66,51 @@ c = conv();
 r = say(c, 'Hola, necesito algo de Spheros');
 check('mención genérica de Spheros no toma el catálogo como pieza', !r.solicitud || !/Catálogo Spheros 2025/.test(r.solicitud.fields.refaccion || ''), JSON.stringify(r));
 
-// 4e. Válvula de expansión genérica para CC355: pregunta la variante,
-// nunca toma el título de la sección "Termostatos, válvulas..."
+// 4e. Válvula de expansión para CC355: solo oring o flange, NUNCA la TGE 450
 c = conv();
 r = say(c, 'ocupo una válvula de expansión para CC355');
-check('válvula de expansión genérica pregunta cuál, no toma la sección', r.reply && /oring|TGE|flange/i.test(r.reply) && !/Termostatos/i.test(r.reply), r.reply);
+check('válvula CC355 pregunta oring o flange, no TGE', r.reply && /oring/i.test(r.reply) && /flange/i.test(r.reply) && !/TGE/i.test(r.reply), r.reply);
 r = say(c, 'la de oring');
 check('válvula oring pide nombre', r.reply && /nombre/i.test(r.reply), r.reply);
 r = say(c, 'Carlos Ruiz');
 check('válvula oring 355 canaliza con lo pedido y su código', !!r.solicitud && /TOEX-E0647/i.test(r.solicitud.resumen) && /oring/i.test(r.solicitud.fields.refaccion || '') && !/Termostatos/i.test(r.solicitud.resumen), JSON.stringify(r.solicitud && r.solicitud.resumen));
+check('válvula oring 355 es para CC355', r.solicitud && r.solicitud.fields.equipo === 'Spheros CC355', JSON.stringify(r.solicitud && r.solicitud.fields));
+
+// 4e2. Válvula de expansión para CC450: la TGE, directo
+c = conv();
+r = say(c, 'ocupo una válvula de expansión para CC450');
+check('válvula CC450 resuelve TGE sin preguntar', r.reply && /nombre/i.test(r.reply), r.reply);
+r = say(c, 'Ana Torres');
+check('válvula TGE 450 canaliza para CC450', !!r.solicitud && /067N7161/.test(r.solicitud.resumen || '') && r.solicitud.fields.equipo === 'Spheros CC450', JSON.stringify(r.solicitud));
+
+// 4e3. Válvula sin equipo: pregunta CC450 o CC355 primero
+c = conv();
+r = say(c, 'ocupo una válvula de expansión');
+check('válvula sin equipo pregunta CC450 o CC355', r.reply && /CC450/.test(r.reply) && /CC355/.test(r.reply), r.reply);
+r = say(c, 'para CC355');
+check('válvula CC355 tras elegir equipo pregunta oring o flange', r.reply && /oring/i.test(r.reply) && /flange/i.test(r.reply), r.reply);
+
+// 4g. Mapeos de equipo revisados: control 163 -> CC355, SBU410 -> CC450,
+// sensor azul -> CC450, chicote/canasta -> CC355, presostato -> ambos
+c = conv();
+r = say(c, 'ocupo un control 163');
+check('control 163 pide nombre', r.reply && /nombre/i.test(r.reply), r.reply);
+r = say(c, 'Luis Méndez');
+check('control 163 es para CC355', !!r.solicitud && r.solicitud.fields.equipo === 'Spheros CC355', JSON.stringify(r.solicitud && r.solicitud.fields));
+c = conv();
+r = say(c, 'ocupo un SBU410');
+r = say(c, 'Luis Méndez');
+check('SBU410 es para CC450', !!r.solicitud && r.solicitud.fields.equipo === 'Spheros CC450', JSON.stringify(r.solicitud && r.solicitud.fields));
+c = conv();
+r = say(c, 'necesito un sensor azul');
+r = say(c, 'Luis Méndez');
+check('sensor azul es para CC450', !!r.solicitud && r.solicitud.fields.equipo === 'Spheros CC450', JSON.stringify(r.solicitud && r.solicitud.fields));
+c = conv();
+r = say(c, 'necesito un sensor');
+check('sensor genérico pregunta cuál', r.reply && /canasta|azul|chicote/i.test(r.reply), r.reply);
+r = say(c, 'chicote');
+r = say(c, 'Luis Méndez');
+check('chicote es para CC355', !!r.solicitud && r.solicitud.fields.equipo === 'Spheros CC355', JSON.stringify(r.solicitud && r.solicitud.fields));
 
 // 4f. Ventilador genérico: pregunta condensador o evaporador
 c = conv();

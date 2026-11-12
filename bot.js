@@ -102,12 +102,16 @@ function ambiguousQuestion(text) {
   if (t.trim() === 'condensador' || /\bel condensador\b/.test(t)) {
     return '¿Te refieres al ventilador/motor del condensador (el abanico) o al serpentín del condensador?';
   }
-  // Válvula de expansión genérica: hay 3 variantes, preguntar cuál.
-  if (/\bvalvula de expansion\b/.test(t) && !t.includes('450') && !t.includes('355') && !t.includes('tge') && !t.includes('oring') && !t.includes('flange') && !t.includes('067n7161') && !t.includes('012-00052') && !t.includes('toex')) {
-    return '¿Cuál válvula de expansión necesita: la Danfoss TGE para el 450, la Spheros flange o la de oring para el 355?';
-  }
-  if (/\bvalvula de expansion\b/.test(t) && t.includes('355') && !t.includes('oring')) {
-    return '¿Es la válvula de expansión de oring para el 355 (Resideo/Honeywell TOEX-E0647)?';
+  // Válvula de expansión: la variante depende del equipo (revisado 2026-11-12).
+  // TGE 450 es SOLO para CC450; para CC355 son la de oring y la flange/flare.
+  if (/\bvalvula de expansion\b/.test(t)) {
+    if (t.includes('355')) {
+      if (t.includes('oring') || t.includes('toex')) return null; // ya se resolvió por código/sinónimo
+      return '¿Es la válvula de oring (Resideo TOEX-E0647) o la Spheros flange (012-00052-000)?';
+    }
+    if (t.includes('450') || t.includes('tge') || t.includes('067n7161')) return null; // TGE, solo CC450
+    if (t.includes('oring') || t.includes('flange') || t.includes('flare')) return null;
+    return '¿Para qué equipo es la válvula: CC450 (Danfoss TGE) o CC355 (oring o flange)?';
   }
   // Ventilador genérico: preguntar de condensador o de evaporador.
   if (/\bventilador\b/.test(t) && !t.includes('condensador') && !t.includes('evaporador') && !t.includes('ciroco')) {
@@ -118,6 +122,13 @@ function ambiguousQuestion(text) {
 
 function detectEquipo(text) {
   const t = norm(text);
+  // Mapeos confirmados por el usuario (revisados 2026-11-12):
+  // SBU410 (SCB-410) -> CC450; control 163 (GL-W163) -> CC355;
+  // sensor azul -> CC450; chicote o canasta -> CC355.
+  if (/sbu ?410|scb[- ]?410/.test(t)) return 'Spheros CC450';
+  if (/control 163|163/.test(t) && /control/.test(t)) return 'Spheros CC355';
+  if (t.includes('sensor azul')) return 'Spheros CC450';
+  if (t.includes('chicote') || t.includes('canasta')) return 'Spheros CC355';
   if (t.includes('cc450') || t.includes('cc 450')) return 'Spheros CC450';
   if (t.includes('cc355') || t.includes('cc 355')) return 'Spheros CC355';
   if (t.includes('cc300') || t.includes('cc 300')) return 'Globus CC300';
@@ -228,6 +239,16 @@ function handleMessage(conv, msg) {
   // Resolver una pregunta de desambiguación pendiente con la respuesta del cliente
   if (f._pendiente && text) {
     const t = norm(text);
+    // Válvula: primero el equipo, luego la variante de ese equipo.
+    if (f._pendiente === 'valvulaEquipo') {
+      if (/450/.test(t)) {
+        f.refaccion = 'Válvula de expansión termostática Danfoss TGE — expansión 450 (067N7161)';
+        f.equipo = 'Spheros CC450'; delete f._pendiente;
+      } else if (/355/.test(t)) {
+        f.equipo = 'Spheros CC355'; f._pendiente = 'valvula';
+        return { reply: '¿Es la válvula de oring (Resideo TOEX-E0647) o la Spheros flange (012-00052-000)?', solicitud: null, close: false };
+      }
+    }
     const P = {
       presostato: [[/baja|azul/, 'Protección baja — presostato de baja presión (cable AZUL)'], [/alta|negro/, 'Protección alta — presostato de alta presión (cable NEGRO)']],
       sensor: [[/canasta/, 'Sensor canasta / sensor azul / chicote (sensor de temperatura) — canasta'], [/azul/, 'Sensor canasta / sensor azul / chicote (sensor de temperatura) — azul'], [/chicote/, 'Sensor canasta / sensor azul / chicote (sensor de temperatura) — chicote']],
@@ -237,13 +258,17 @@ function handleMessage(conv, msg) {
       bock: [[/655/, 'Compresor Bock 655 (FKX40/655K)'], [/755/, 'Compresor Bock 755 (FKX40/755K)']],
       bosch150: [[/3 agarres|tres agarres/, 'Alternador Bosch 150 de 3 agarres'], [/2 agarres|dos agarres/, 'Alternador Bosch 150 de 2 agarres']],
       condensador: [[/ventilador|motor|abanico/, 'Ventilador / motor de condensador Spheros Valeo (111150818)'], [/serpentin|serpentín/, 'Serpentín del condensador']],
-      valvula: [[/oring|355/, 'Válvula de expansión oring 355 — Resideo / Honeywell (TOEX-E0647)'], [/tge|450/, 'Válvula de expansión termostática Danfoss TGE — expansión 450 (067N7161)'], [/flange|spheros/, 'Válvula de expansión Spheros flange — Honeywell TBEX-E0475 (012-00052-000)'], [/^si\b|sí|esa|correcto/, 'Válvula de expansión oring 355 — Resideo / Honeywell (TOEX-E0647)']],
+      valvula: [[/flange|flare/, 'Válvula de expansión Spheros flange — Honeywell TBEX-E0475 (012-00052-000)'], [/oring/, 'Válvula de expansión oring 355 — Resideo / Honeywell (TOEX-E0647)'], [/tge|450/, 'Válvula de expansión termostática Danfoss TGE — expansión 450 (067N7161)'], [/355/, 'Válvula de expansión oring 355 — Resideo / Honeywell (TOEX-E0647)'], [/^si\b|sí|esa|correcto/, 'Válvula de expansión oring 355 — Resideo / Honeywell (TOEX-E0647)']],
       ventilador2: [[/condensador/, 'Ventilador / motor de condensador Spheros Valeo (111150818)'], [/evaporador/, 'Ventilador / motor de evaporador Spheros Valeo — ciroco (111151028)']],
     };
     const opts = P[f._pendiente] || [];
     for (const [re, titulo] of opts) {
       if (re.test(t)) {
         if (titulo) f.refaccion = titulo;
+        // Sensor: la variante define el equipo (azul -> CC450; canasta/chicote -> CC355).
+        if (f._pendiente === 'sensor') {
+          f.equipo = /azul/.test(re.source) ? 'Spheros CC450' : 'Spheros CC355';
+        }
         else if (f._pendiente === 'filtro') f.refaccion = (f._filtroBase || 'Filtro deshidratador Danfoss') + ' ' + (t.includes('flare') ? 'flare' : 'oring');
         delete f._pendiente; delete f._filtroBase;
         break;
@@ -283,7 +308,10 @@ function handleMessage(conv, msg) {
   }
   const amb = ambiguousQuestion(text);
   if (amb && !f.refaccion) return askAmb(conv, amb, text);
-  if (amb && f.refaccion && /^(¿Es|¿Cuál|¿Necesitas)/.test(amb)) {
+  if (amb && f.refaccion && /^(¿Es|¿Cuál|¿Necesitas|¿Para)/.test(amb)) {
+    // La pregunta de equipo para la válvula aplica aunque ya haya pieza:
+    // la variante depende del equipo.
+    if (amb.startsWith('¿Para qué equipo es la válvula')) return askAmb(conv, amb, text);
     // La pieza ya se reconoció por código, pero la variante sigue ambigua:
     // preguntar solo si la variante no quedó clara en el texto.
     if (!/baja|alta|azul|negro|flare|oring|derecho|izquierdo|655|755|3 agarres|2 agarres|ventilador|serpentín|serpentin|portafusible/.test(norm(text))) {
@@ -342,6 +370,8 @@ function askAmb(conv, pregunta, text) {
   else if (pregunta.includes('Bock 655')) kind = 'bock';
   else if (pregunta.includes('agarres')) kind = 'bosch150';
   else if (pregunta.includes('abanico')) kind = 'condensador';
+  else if (pregunta.includes('¿Para qué equipo es la válvula')) kind = 'valvulaEquipo';
+  else if (pregunta.includes('válvula de oring')) kind = 'valvula';
   else if (pregunta.includes('válvula de expansión')) kind = 'valvula';
   else if (pregunta.includes('ventilador del condensador')) kind = 'ventilador2';
   if (kind) conv.fields._pendiente = kind;

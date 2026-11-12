@@ -23,7 +23,7 @@
         "007-00161-000",
         "007-00157-000"
       ],
-      "detalle": "Control CC450: SCB-410, SCB-2000, GL-W163 / GL-W210. Control CC355. Placas de comando eléctrico: 007-00157-001, 007-00161-000, 007-00157-000. Tablero Setbus CC450 y Globus CC355.",
+      "detalle": "Control CC450: SBU410 (SCB-410). Control CC355: control 163 (GL-W163). Placas de comando eléctrico: 007-00157-001, 007-00161-000, 007-00157-000. Tablero Setbus CC450 y Globus CC355.",
       "id": 2,
       "titulo": "Controladores electrónicos y placas CC450 / CC355",
       "seccion": true
@@ -179,7 +179,7 @@
     },
     {
       "codigos": [],
-      "detalle": "Presostato de baja presión. También: protección de baja, sensor de presión de baja, presostato baja. Caja con etiqueta PROTECCION BAJA AZUL: sensores cilíndricos metálicos con rosca dorada y cables AZULES. Se distingue de la de alta SOLO por el color del cable: azul = baja.",
+      "detalle": "Presostato de baja presión. También: protección de baja, sensor de presión de baja, presostato baja. Caja con etiqueta PROTECCION BAJA AZUL: sensores cilíndricos metálicos con rosca dorada y cables AZULES. Se distingue de la de alta SOLO por el color del cable: azul = baja. Para ambos equipos, CC450 y CC355.",
       "id": 16,
       "pregunta": "¿Es la de BAJA (cable azul) o la de ALTA (cable negro)?",
       "sinonimos": [
@@ -191,7 +191,7 @@
       "titulo": "Protección baja — presostato de baja presión (cable AZUL)"
     },
     {
-      "detalle": "Presostato de alta presión. También: protección de alta, sensor de presión de alta, presostato alta. Caja con etiqueta PROTECCION ALTA NEGRO: sensores cilíndricos metálicos con rosca dorada y cables NEGROS. Negro = alta.",
+      "detalle": "Presostato de alta presión. También: protección de alta, sensor de presión de alta, presostato alta. Caja con etiqueta PROTECCION ALTA NEGRO: sensores cilíndricos metálicos con rosca dorada y cables NEGROS. Negro = alta. Para ambos equipos, CC450 y CC355.",
       "id": 17,
       "pregunta": "¿Es la de BAJA (cable azul) o la de ALTA (cable negro)?",
       "sinonimos": [
@@ -259,7 +259,7 @@
         "GL-W163",
         "007-00089-000"
       ],
-      "detalle": "Control 163: GL-W163, Spheros 007-00089-000, SW 2.0, Globus. Cajas blancas Spheros con etiqueta CONTROL 163. NO confundir con el GL-W210 (control 210).",
+      "detalle": "Control 163: GL-W163, Spheros 007-00089-000, SW 2.0, Globus. Cajas blancas Spheros con etiqueta CONTROL 163. NO confundir con el GL-W210 (control 210). Para CC355.",
       "id": 23,
       "sinonimos": [
         "control 163"
@@ -282,12 +282,14 @@
       "codigos": [
         "067N7161"
       ],
-      "detalle": "Danfoss TGE, código 067N7161, R134a/R513A, Orif 8, 4.5 TR, 17 kW, 1/2 x 5/8 x 1/4 in. Etiqueta EXP. 450: también expansión 450, válvula de expansión 450, válvula TGE. NO confundir con la Spheros flange 012-00052-000 ni con la oring 355 TOEX-E0647.",
+      "detalle": "Danfoss TGE, código 067N7161, R134a/R513A, Orif 8, 4.5 TR, 17 kW, 1/2 x 5/8 x 1/4 in. Etiqueta EXP. 450: también expansión 450, válvula de expansión 450, válvula TGE. NO confundir con la Spheros flange 012-00052-000 ni con la oring 355 TOEX-E0647. Solo para CC450, NO para CC355.",
       "id": 25,
       "sinonimos": [
         "expansión 450",
-        "válvula tge",
-        "válvula de expansión 450"
+        "válvula de expansión 450",
+        "válvula de expansión cc450",
+        "válvula de expansión para cc450",
+        "válvula tge"
       ],
       "titulo": "Válvula de expansión termostática Danfoss TGE — expansión 450 (067N7161)"
     },
@@ -296,11 +298,13 @@
         "012-00052-000",
         "TBEX-E0475"
       ],
-      "detalle": "Spheros 012-00052-000, VALVULA DE EXPANSAO - FLANGE, Honeywell TBEX-E0475, R134a. Válvula de latón con bulbo de cobre. NO confundir con la Danfoss 067N7161 ni con la oring 355 TOEX-E0647.",
+      "detalle": "Spheros 012-00052-000, VALVULA DE EXPANSAO - FLANGE, Honeywell TBEX-E0475, R134a. Válvula de latón con bulbo de cobre. NO confundir con la Danfoss 067N7161 ni con la oring 355 TOEX-E0647. Para CC355.",
       "id": 26,
       "sinonimos": [
         "válvula de expansión flange",
-        "válvula de expansión spheros"
+        "válvula de expansión flare",
+        "válvula de expansión spheros",
+        "válvula flare 355"
       ],
       "titulo": "Válvula de expansión Spheros flange — Honeywell TBEX-E0475 (012-00052-000)"
     },
@@ -505,6 +509,22 @@
       "id": 44,
       "regla": "bosch150_ambiguo",
       "titulo": "Regla alternador Bosch 150"
+    },
+    {
+      "id": 45,
+      "titulo": "Control SBU410 — SCB-410 (para CC450)",
+      "detalle": "SBU410 (SCB-410), control para CC450. NO confundir con el control 163 (GL-W163), que es para CC355.",
+      "sinonimos": [
+        "sbu410",
+        "sbu 410",
+        "control sbu410",
+        "scb-410",
+        "scb 410"
+      ],
+      "codigos": [
+        "SCB-410",
+        "SBU410"
+      ]
     }
   ],
   "source": "Demo artifact 'chatbot-del-taller' getstate, 2026-11-12. Sin precios: esta base nunca contiene precios ni rangos."
