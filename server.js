@@ -175,6 +175,11 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ solicitudes: solicitudes.slice().reverse(), uso: usageThisMonth(), alertas: alerts.slice(-10) }, null, 2));
     return;
   }
+  if (req.method === 'GET' && url.pathname === '/privacidad') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Política de Privacidad — Almacén Impulsora</title></head><body><h1>Política de Privacidad — Almacén Impulsora</h1><p>Última actualización: 12 de noviembre de 2026.</p><p>Almacén Impulsora es un taller de aire acondicionado para camiones y autobuses en Culiacán, Sinaloa, México. Su chatbot de WhatsApp (número +52 667 131 6147) atiende solicitudes de refacciones, servicio, reparación e instalación, y consultas sobre el estatus de una unidad en taller.</p><h2>Datos que se recopilan</h2><p>Cuando un cliente escribe al chatbot por WhatsApp, se recopilan únicamente los datos que el cliente proporciona en la conversación y los que WhatsApp entrega con el mensaje: número de teléfono, nombre de perfil de WhatsApp, el contenido del mensaje y, si el cliente envía una foto, la imagen. Para consultar el estatus de una reparación se pueden pedir nombre, empresa, ruta, número de camión o chasis.</p><h2>Uso de los datos</h2><p>Los datos se usan solo para atender la solicitud del cliente: identificar la refacción o el equipo, consultar el estatus de la unidad y canalizar la solicitud con una persona de almacén. No se venden, no se comparten con terceros con fines publicitarios y no se usan para enviar publicidad.</p><h2>Conservación</h2><p>Las solicitudes quedan guardadas en la bandeja interna del taller solo el tiempo necesario para atenderlas y darles seguimiento.</p><h2>Derechos</h2><p>Cualquier persona puede pedir que sus datos se corrijan o eliminen escribiendo al mismo número de WhatsApp +52 667 131 6147 o acudiendo al taller.</p><h2>Contacto</h2><p>Almacén Impulsora — WhatsApp +52 667 131 6147, Culiacán, Sinaloa, México.</p></body></html>`);
+    return;
+  }
   if (req.method === 'GET' && url.pathname === '/') {
     const u = usageThisMonth();
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
