@@ -1,0 +1,6 @@
+# Secretos y estado local — NUNCA se suben a GitHub ni a Render como archivos
+.env
+data/
+node_modules/
+bin/
+*.log

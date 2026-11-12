@@ -1,0 +1,8 @@
+{
+  "name": "chatbot-taller-almacen-impulsora",
+  "version": "1.0.0",
+  "description": "Webhook de WhatsApp Cloud API para el chatbot del taller Almacén Impulsora. Sin dependencias, sin método de pago.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node test-bot.js" },
+  "engines": { "node": ">=18" }
+}
