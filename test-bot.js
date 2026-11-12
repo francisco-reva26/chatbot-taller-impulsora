@@ -53,6 +53,19 @@ check('compresor TM65 pide nombre', r.reply && /nombre/i.test(r.reply) && !r.sol
 r = say(c, 'Pedro Gómez');
 check('compresor TM65 por nombre canaliza sin pedir equipo', !!r.solicitud && r.close, JSON.stringify(r));
 
+// 4c. Sello para TM65 -> llega lo que pidió el cliente, no el catálogo
+// (el cliente ya dio su nombre en el mismo mensaje: "soy Francisco")
+c = conv();
+r = say(c, 'Hola soy Francisco, necesito un sello para tm 65 Valeo');
+check('sello para tm65 canaliza con lo pedido, no el catálogo', !!r.solicitud && /sello/i.test(r.solicitud.resumen) && !/Catálogo/i.test(r.solicitud.resumen), JSON.stringify(r.solicitud && r.solicitud.resumen));
+check('sello para tm65 no es el título del catálogo', r.solicitud && !/Catálogo Spheros 2025/.test(r.solicitud.fields.refaccion || ''), JSON.stringify(r.solicitud && r.solicitud.fields));
+check('sello para tm65 guarda el nombre Francisco', r.solicitud && r.solicitud.fields.nombre === 'Francisco', JSON.stringify(r.solicitud && r.solicitud.fields));
+
+// 4d. Solo "algo de Spheros" no inventa refacción del catálogo
+c = conv();
+r = say(c, 'Hola, necesito algo de Spheros');
+check('mención genérica de Spheros no toma el catálogo como pieza', !r.solicitud || !/Catálogo Spheros 2025/.test(r.solicitud.fields.refaccion || ''), JSON.stringify(r));
+
 // 5. Filtro 304 ambiguo
 c = conv();
 r = say(c, 'ocupo un filtro 304 para CC355');

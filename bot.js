@@ -38,12 +38,16 @@ const norm = (s) => (s || '').toLowerCase()
 // --- Búsqueda en la base -------------------------------------------------
 function findKb(text) {
   const t = norm(text);
+  const tFlat = t.replace(/[^a-z0-9]/g, ''); // para códigos con espacio: "TM 65" = "TM65"
   const hits = [];
   for (const item of kb.items) {
+    // Las secciones del catálogo (p. ej. el título general) no son una
+    // refacción: nunca se usan como la pieza que pidió el cliente.
+    if (item.seccion) continue;
     const hay = norm([item.titulo, item.detalle, (item.sinonimos || []).join(' '), (item.codigos || []).join(' ')].join(' '));
-    // Código exacto (p. ej. 007-00161-000, T95177AY, 023Z0264)
+    // Código exacto (p. ej. 007-00161-000, T95177AY, 023Z0264, TM65/TM 65)
     for (const c of (item.codigos || [])) {
-      if (c && t.includes(norm(c))) { hits.push({ item, score: 100, via: 'codigo:' + c }); break; }
+      if (c && (t.includes(norm(c)) || tFlat.includes(norm(c).replace(/[^a-z0-9]/g, '')))) { hits.push({ item, score: 100, via: 'codigo:' + c }); break; }
     }
     if (hits.some(h => h.item.id === item.id)) continue;
     for (const s of (item.sinonimos || [])) {
@@ -163,6 +167,13 @@ function handleMessage(conv, msg) {
 
   if (!conv.intent) conv.intent = detectIntent(text);
   const f = conv.fields;
+
+  // Guardar lo que el cliente pidió con sus propias palabras (p. ej.
+  // "sello para tm65"): es lo que debe llegar en el aviso a almacén, no el
+  // título genérico de la sección del catálogo.
+  if (conv.intent === 'refaccion' && text && !f.pedido) {
+    f.pedido = text.replace(/^(hola|buenas tardes|buenas noches|buenos d[ií]as|qu[eé] tal|buenas)[,\s]*/i, '').trim().slice(0, 120);
+  }
 
   // Foto: es foto de la pieza (refacción) o de la unidad (estatus/servicio)
   if (hasPhoto) {
@@ -284,7 +295,7 @@ function handleMessage(conv, msg) {
   // código reconocido, p. ej. compresor TM65), NO se pide el equipo: se
   // canaliza directo. El equipo solo se pregunta cuando el cliente no sabe
   // el número de parte ni los datos de la refacción (p. ej. solo manda foto).
-  const resumen = (f.nombre ? f.nombre + ' busca ' : 'Cliente busca ') + (f.refaccion || 'refacción') + (f.equipo ? ' para ' + f.equipo : '');
+  const resumen = (f.nombre ? f.nombre + ' busca ' : 'Cliente busca ') + (f.pedido || f.refaccion || 'refacción') + (f.equipo ? ' para ' + f.equipo : '');
   const sol = buildSolicitud(conv, 'refaccion', resumen);
   return fin(conv, { reply: CANALIZAR_MSG, solicitud: sol, close: true });
 }
