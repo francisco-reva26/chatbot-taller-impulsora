@@ -5,7 +5,10 @@
 //    empresa, ruta, número de camión o chasis.
 //  - Al canalizar, NUNCA decir los nombres de Francisco ni de Manuel al
 //    cliente: "una persona de almacén lo atenderá a la brevedad".
-//  - Refacción: solo pedir equipo/modelo (o foto). NO pedir ruta, camión,
+//  - Refacción: si la pieza quedó clara por nombre o código (p. ej.
+//    compresor TM65), NO se pide el equipo, se canaliza directo. El equipo
+//    solo se pregunta cuando el cliente no sabe el número de parte ni los
+//    datos de la refacción (p. ej. solo manda foto). NO pedir ruta, camión,
 //    empresa ni chasis. Estatus: ahí sí pedir nombre, empresa, ruta,
 //    número de camión o chasis.
 //  - Cerrar la conversación antes de cualquier cobro: una vez canalizada
@@ -255,11 +258,15 @@ function handleMessage(conv, msg) {
     if (isGreeting(text)) return { reply: 'Hola, ¿qué refacción busca? Dígame el equipo (Valeo, Spheros CC450, CC355 o Eberspächer) y la pieza o el código, o mándeme una foto de la pieza.', solicitud: null, close: false };
     return { reply: '¿Qué refacción busca? Dígame el equipo y la pieza o el código, o mándeme una foto de la pieza.', solicitud: null, close: false };
   }
-  if (!f.equipo) {
-    return { reply: 'Ya la ubiqué: ' + (f.refaccion || 'la pieza') + '. ¿Para qué equipo es? Valeo, Spheros CC450, CC355 o Eberspächer.', solicitud: null, close: false };
+  // Foto sin datos de la pieza: ahí sí se pregunta el equipo.
+  if (f.refaccion === 'foto de la pieza' && !f.equipo) {
+    return { reply: 'Ya recibí la foto. ¿Para qué equipo es la pieza? Valeo, Spheros CC450, CC355 o Eberspächer.', solicitud: null, close: false };
   }
-  // Solicitud completa: canalizar y cerrar (nunca decir nombres al cliente).
-  const resumen = (f.nombre ? f.nombre + ' busca ' : 'Cliente busca ') + (f.refaccion || 'refacción') + ' para ' + f.equipo;
+  // Regla del usuario 2026-11-12: si la refacción ya quedó clara (nombre o
+  // código reconocido, p. ej. compresor TM65), NO se pide el equipo: se
+  // canaliza directo. El equipo solo se pregunta cuando el cliente no sabe
+  // el número de parte ni los datos de la refacción (p. ej. solo manda foto).
+  const resumen = (f.nombre ? f.nombre + ' busca ' : 'Cliente busca ') + (f.refaccion || 'refacción') + (f.equipo ? ' para ' + f.equipo : '');
   const sol = buildSolicitud(conv, 'refaccion', resumen);
   return fin(conv, { reply: CANALIZAR_MSG, solicitud: sol, close: true });
 }

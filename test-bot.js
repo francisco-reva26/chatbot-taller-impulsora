@@ -33,14 +33,17 @@ c = conv();
 r = say(c, 'Necesito un presostato');
 check('presostato ambiguo pregunta baja/alta', r.reply && r.reply.includes('BAJA') && r.reply.includes('ALTA'), r.reply);
 r = say(c, 'el de baja, cable azul');
-check('presostato baja se reconoce y pide equipo', r.reply && !r.solicitud, r.reply);
-r = say(c, 'para un CC450');
-check('presostato baja + CC450 canaliza', !!r.solicitud, JSON.stringify(r));
+check('presostato baja ya clara canaliza directo sin pedir equipo', !!r.solicitud && r.close, JSON.stringify(r));
 
-// 4. Código solo -> reconoce TM65
+// 4. Código solo -> reconoce TM65 y canaliza directo sin pedir equipo
 c = conv();
 r = say(c, 'T95177AY');
-check('código T95177AY reconocido (pregunta equipo)', r.reply && r.reply.includes('TM65') || (r.reply && /equipo/i.test(r.reply)), r.reply);
+check('código T95177AY reconocido y canaliza sin pedir equipo', !!r.solicitud && r.close, JSON.stringify(r));
+
+// 4b. Compresor TM65 por nombre -> canaliza directo sin pedir equipo
+c = conv();
+r = say(c, 'Buenas tardes maneja compresor tm65,');
+check('compresor TM65 por nombre canaliza sin pedir equipo', !!r.solicitud && r.close, JSON.stringify(r));
 
 // 5. Filtro 304 ambiguo
 c = conv();
