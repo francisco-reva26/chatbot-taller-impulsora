@@ -102,6 +102,17 @@ function ambiguousQuestion(text) {
   if (t.trim() === 'condensador' || /\bel condensador\b/.test(t)) {
     return '¿Te refieres al ventilador/motor del condensador (el abanico) o al serpentín del condensador?';
   }
+  // Válvula de expansión genérica: hay 3 variantes, preguntar cuál.
+  if (/\bvalvula de expansion\b/.test(t) && !t.includes('450') && !t.includes('355') && !t.includes('tge') && !t.includes('oring') && !t.includes('flange') && !t.includes('067n7161') && !t.includes('012-00052') && !t.includes('toex')) {
+    return '¿Cuál válvula de expansión necesita: la Danfoss TGE para el 450, la Spheros flange o la de oring para el 355?';
+  }
+  if (/\bvalvula de expansion\b/.test(t) && t.includes('355') && !t.includes('oring')) {
+    return '¿Es la válvula de expansión de oring para el 355 (Resideo/Honeywell TOEX-E0647)?';
+  }
+  // Ventilador genérico: preguntar de condensador o de evaporador.
+  if (/\bventilador\b/.test(t) && !t.includes('condensador') && !t.includes('evaporador') && !t.includes('ciroco')) {
+    return '¿Es el ventilador del condensador o el del evaporador?';
+  }
   return null;
 }
 
@@ -226,6 +237,8 @@ function handleMessage(conv, msg) {
       bock: [[/655/, 'Compresor Bock 655 (FKX40/655K)'], [/755/, 'Compresor Bock 755 (FKX40/755K)']],
       bosch150: [[/3 agarres|tres agarres/, 'Alternador Bosch 150 de 3 agarres'], [/2 agarres|dos agarres/, 'Alternador Bosch 150 de 2 agarres']],
       condensador: [[/ventilador|motor|abanico/, 'Ventilador / motor de condensador Spheros Valeo (111150818)'], [/serpentin|serpentín/, 'Serpentín del condensador']],
+      valvula: [[/oring|355/, 'Válvula de expansión oring 355 — Resideo / Honeywell (TOEX-E0647)'], [/tge|450/, 'Válvula de expansión termostática Danfoss TGE — expansión 450 (067N7161)'], [/flange|spheros/, 'Válvula de expansión Spheros flange — Honeywell TBEX-E0475 (012-00052-000)'], [/^si\b|sí|esa|correcto/, 'Válvula de expansión oring 355 — Resideo / Honeywell (TOEX-E0647)']],
+      ventilador2: [[/condensador/, 'Ventilador / motor de condensador Spheros Valeo (111150818)'], [/evaporador/, 'Ventilador / motor de evaporador Spheros Valeo — ciroco (111151028)']],
     };
     const opts = P[f._pendiente] || [];
     for (const [re, titulo] of opts) {
@@ -287,15 +300,24 @@ function handleMessage(conv, msg) {
   }
   // Número no registrado (sin nombre): pedir el nombre del cliente antes
   // de canalizar, para que la solicitud llegue con quién la pide.
+  // Se repite lo que el cliente pidió con sus palabras, nunca el título
+  // genérico de una sección del catálogo.
   if (!f.nombre) {
     f._pideNombre = true;
-    return { reply: 'Claro, con gusto tomo su solicitud de ' + (f.refaccion || 'la refacción') + (f.equipo ? ' para ' + f.equipo : '') + '. ¿Me dice su nombre para registrarla?', solicitud: null, close: false };
+    // Si preguntó precio, no se le repite su pregunta: se nombra la pieza.
+    const que = asksPrice(text) ? (f.refaccion || 'la refacción') : (f.pedido || f.refaccion || 'la refacción');
+    return { reply: 'Claro, con gusto tomo su solicitud de ' + que + (f.equipo ? ' para ' + f.equipo : '') + '. ¿Me dice su nombre para registrarla?', solicitud: null, close: false };
   }
   // Regla del usuario 2026-11-12: si la refacción ya quedó clara (nombre o
   // código reconocido, p. ej. compresor TM65), NO se pide el equipo: se
   // canaliza directo. El equipo solo se pregunta cuando el cliente no sabe
   // el número de parte ni los datos de la refacción (p. ej. solo manda foto).
-  const resumen = (f.nombre ? f.nombre + ' busca ' : 'Cliente busca ') + (f.pedido || f.refaccion || 'refacción') + (f.equipo ? ' para ' + f.equipo : '');
+  // Resumen para el aviso: lo que pidió el cliente con sus palabras, más
+  // el código/variante que se resolvió (p. ej. TOEX-E0647) si no venía ahí.
+  let detalle = f.pedido || f.refaccion || 'refacción';
+  const cod = (f.refaccion || '').match(/\(([^)]+)\)/);
+  if (cod && detalle && !detalle.toLowerCase().includes(cod[1].toLowerCase().split(' / ')[0])) detalle += ' (' + cod[1] + ')';
+  const resumen = (f.nombre ? f.nombre + ' busca ' : 'Cliente busca ') + detalle + (f.equipo ? ' para ' + f.equipo : '');
   const sol = buildSolicitud(conv, 'refaccion', resumen);
   return fin(conv, { reply: CANALIZAR_MSG, solicitud: sol, close: true });
 }
@@ -320,6 +342,8 @@ function askAmb(conv, pregunta, text) {
   else if (pregunta.includes('Bock 655')) kind = 'bock';
   else if (pregunta.includes('agarres')) kind = 'bosch150';
   else if (pregunta.includes('abanico')) kind = 'condensador';
+  else if (pregunta.includes('válvula de expansión')) kind = 'valvula';
+  else if (pregunta.includes('ventilador del condensador')) kind = 'ventilador2';
   if (kind) conv.fields._pendiente = kind;
   return { reply: pregunta, solicitud: null, close: false };
 }

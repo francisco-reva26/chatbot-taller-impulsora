@@ -25,7 +25,8 @@
       ],
       "detalle": "Control CC450: SCB-410, SCB-2000, GL-W163 / GL-W210. Control CC355. Placas de comando eléctrico: 007-00157-001, 007-00161-000, 007-00157-000. Tablero Setbus CC450 y Globus CC355.",
       "id": 2,
-      "titulo": "Controladores electrónicos y placas CC450 / CC355"
+      "titulo": "Controladores electrónicos y placas CC450 / CC355",
+      "seccion": true
     },
     {
       "codigos": [
@@ -42,7 +43,8 @@
       ],
       "detalle": "TM-16, TM-21, TM-31 y TM-65 (el TM65 es el de más uso), Bock FKX40, Bock FKX50, Bitzer, SP-21 y SP-31, compresores Valeo TM13/TM16, TM-08/TM-13/TM-16, compresor para Sprinter y Master.",
       "id": 3,
-      "titulo": "Compresores"
+      "titulo": "Compresores",
+      "seccion": true
     },
     {
       "detalle": "Embragues magnéticos, embrague o polea de compresor, embragues con bobina, poleas y discos, protecciones Bock.",
@@ -52,7 +54,8 @@
         "polea compresor",
         "embrague magnético"
       ],
-      "titulo": "Embragues de compresor"
+      "titulo": "Embragues de compresor",
+      "seccion": true
     },
     {
       "detalle": "Termostatos, válvulas de expansión, sensores de temperatura, anticongelamiento, sensor chicote y canasta, sensor azul, presostatos, relés y fusibles.",
@@ -62,7 +65,8 @@
         "válvula de expansión",
         "sensor de temperatura"
       ],
-      "titulo": "Termostatos, válvulas de expansión y sensores"
+      "titulo": "Termostatos, válvulas de expansión y sensores",
+      "seccion": true
     },
     {
       "detalle": "Ventiladores de evaporador y de condensador 24V, motor de evaporador (ciroco) y motor de condensador (abanico). El ventilador de evaporador ORIGINAL Valeo dura 24 meses; el recondicionado dura 4 meses — el taller recomienda el original.",
@@ -74,7 +78,8 @@
         "motor evaporador",
         "motor condensador"
       ],
-      "titulo": "Ventiladores y motores 24V"
+      "titulo": "Ventiladores y motores 24V",
+      "seccion": true
     },
     {
       "detalle": "Empaques y sello para compresor TM65, y empaques Bock y Bitzer.",
@@ -100,7 +105,8 @@
         "filtro deshidratador",
         "manguera vibradora"
       ],
-      "titulo": "Filtros secadores y mangueras"
+      "titulo": "Filtros secadores y mangueras",
+      "seccion": true
     },
     {
       "detalle": "Conversor 24V/12V y toma USB.",
@@ -109,7 +115,8 @@
         "conversor",
         "convertidor"
       ],
-      "titulo": "Conversores y USB"
+      "titulo": "Conversores y USB",
+      "seccion": true
     },
     {
       "detalle": "Comandos itinerarios y reglas (réguas) de LED.",
@@ -118,7 +125,8 @@
         "letrero",
         "itinerario"
       ],
-      "titulo": "Comandos itinerarios y reglas de LED"
+      "titulo": "Comandos itinerarios y reglas de LED",
+      "seccion": true
     },
     {
       "detalle": "Sacador kit, catraca, pente de aletas, embreagem TM65, engate rápido, manómetros de baja y de alta presión, manguera múltiple, bomba de vacío, estación recicladora / recolhedora, balanza, vacuómetro y tanque.",
@@ -127,7 +135,8 @@
         "manómetro",
         "bomba de vacío"
       ],
-      "titulo": "Herramientas de refrigeración"
+      "titulo": "Herramientas de refrigeración",
+      "seccion": true
     },
     {
       "detalle": "Rolamento de embrague, compresor, kit de juntas, Bock FKX40, TM-31, Bitzer 4N, sello / sensor, sensor de evaporador.",
@@ -135,7 +144,8 @@
       "sinonimos": [
         "denso"
       ],
-      "titulo": "Aplicación Denso"
+      "titulo": "Aplicación Denso",
+      "seccion": true
     },
     {
       "detalle": "Sensor de temperatura, presostato de baja, filtro secador R134A, ventilador de condensador 24V, sello de compresor, ventilador de evaporador 24V, embreagem polia 2A-2B.",
@@ -143,7 +153,8 @@
       "sinonimos": [
         "tk"
       ],
-      "titulo": "Aplicación TK"
+      "titulo": "Aplicación TK",
+      "seccion": true
     },
     {
       "codigos": [
@@ -154,7 +165,8 @@
       ],
       "detalle": "Compresores Sanden SD7H15, SD7V16, SD5S14 y PXE-16; motor limpiador 24V Valeo, bomba de agua, ventiladores evaporadores 12V y 24V, mangueras, condensador universal 14x30, defroster de camarote.",
       "id": 14,
-      "titulo": "Agrícola, vans y vehículos especiales"
+      "titulo": "Agrícola, vans y vehículos especiales",
+      "seccion": true
     },
     {
       "detalle": "Reposición de módulos de la línea Spheros: módulos condensadores y evaporadores.",
@@ -162,7 +174,8 @@
       "sinonimos": [
         "módulo"
       ],
-      "titulo": "Módulos línea Spheros"
+      "titulo": "Módulos línea Spheros",
+      "seccion": true
     },
     {
       "codigos": [],

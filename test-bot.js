@@ -66,6 +66,21 @@ c = conv();
 r = say(c, 'Hola, necesito algo de Spheros');
 check('mención genérica de Spheros no toma el catálogo como pieza', !r.solicitud || !/Catálogo Spheros 2025/.test(r.solicitud.fields.refaccion || ''), JSON.stringify(r));
 
+// 4e. Válvula de expansión genérica para CC355: pregunta la variante,
+// nunca toma el título de la sección "Termostatos, válvulas..."
+c = conv();
+r = say(c, 'ocupo una válvula de expansión para CC355');
+check('válvula de expansión genérica pregunta cuál, no toma la sección', r.reply && /oring|TGE|flange/i.test(r.reply) && !/Termostatos/i.test(r.reply), r.reply);
+r = say(c, 'la de oring');
+check('válvula oring pide nombre', r.reply && /nombre/i.test(r.reply), r.reply);
+r = say(c, 'Carlos Ruiz');
+check('válvula oring 355 canaliza con lo pedido y su código', !!r.solicitud && /TOEX-E0647/i.test(r.solicitud.resumen) && /oring/i.test(r.solicitud.fields.refaccion || '') && !/Termostatos/i.test(r.solicitud.resumen), JSON.stringify(r.solicitud && r.solicitud.resumen));
+
+// 4f. Ventilador genérico: pregunta condensador o evaporador
+c = conv();
+r = say(c, 'necesito un ventilador');
+check('ventilador genérico pregunta condensador o evaporador', r.reply && /condensador/i.test(r.reply) && /evaporador/i.test(r.reply), r.reply);
+
 // 5. Filtro 304 ambiguo
 c = conv();
 r = say(c, 'ocupo un filtro 304 para CC355');
