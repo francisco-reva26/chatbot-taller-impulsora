@@ -117,6 +117,10 @@ function ambiguousQuestion(text) {
   if (/\bventilador\b/.test(t) && !t.includes('condensador') && !t.includes('evaporador') && !t.includes('ciroco')) {
     return '¿Es el ventilador del condensador o el del evaporador?';
   }
+  // Embrague: primero para qué compresor es.
+  if (/\bembrague\b/.test(t) && !/tm ?65|tm ?16|tm ?21|tm ?31|bock|bitzer|valeo/.test(t)) {
+    return '¿Para qué compresor es el embrague? TM65, TM16, TM21, TM31, Bock, Bitzer o Valeo.';
+  }
   return null;
 }
 
@@ -249,6 +253,25 @@ function handleMessage(conv, msg) {
         return { reply: '¿Es la válvula de oring (Resideo TOEX-E0647) o la Spheros flange (012-00052-000)?', solicitud: null, close: false };
       }
     }
+    // Embrague: una vez definido el compresor, preguntar el tipo.
+    if (f._pendiente === 'embragueCompresor') {
+      const comp = (t.match(/tm ?65|tm ?16|tm ?21|tm ?31|bock|bitzer|valeo/) || [])[0] || '';
+      const compName = { 'tm65': 'TM65', 'tm 65': 'TM65', 'tm16': 'TM16', 'tm 16': 'TM16', 'tm21': 'TM21', 'tm 21': 'TM21', 'tm31': 'TM31', 'tm 31': 'TM31', 'bock': 'Bock', 'bitzer': 'Bitzer', 'valeo': 'Valeo' }[comp] || comp.toUpperCase();
+      if (compName) {
+        f.refaccion = 'Embrague para compresor ' + compName;
+        f._pendiente = 'embragueTipo';
+        return { reply: '¿El embrague es con bobina? ¿La polea es 2A o 2B?', solicitud: null, close: false };
+      }
+    }
+    if (f._pendiente === 'embragueTipo') {
+      const add = [];
+      if (/sin bobina/.test(t)) add.push('sin bobina');
+      else if (/bobina/.test(t)) add.push('con bobina');
+      if (/2a\b/.test(t)) add.push('polea 2A');
+      if (/2b\b/.test(t)) add.push('polea 2B');
+      if (add.length) f.refaccion = (f.refaccion || 'Embrague') + ' ' + add.join(', ');
+      delete f._pendiente;
+    }
     const P = {
       presostato: [[/baja|azul/, 'Protección baja — presostato de baja presión (cable AZUL)'], [/alta|negro/, 'Protección alta — presostato de alta presión (cable NEGRO)']],
       sensor: [[/canasta/, 'Sensor canasta / sensor azul / chicote (sensor de temperatura) — canasta'], [/azul/, 'Sensor canasta / sensor azul / chicote (sensor de temperatura) — azul'], [/chicote/, 'Sensor canasta / sensor azul / chicote (sensor de temperatura) — chicote']],
@@ -273,6 +296,17 @@ function handleMessage(conv, msg) {
         delete f._pendiente; delete f._filtroBase;
         break;
       }
+    }
+  }
+
+  // Embrague con el compresor ya dicho en el mismo mensaje: preguntar el tipo.
+  if (conv.intent === 'refaccion' && !f._pendiente && /embrague/.test(norm(text))) {
+    const comp = (norm(text).match(/tm ?65|tm ?16|tm ?21|tm ?31|bock|bitzer|valeo/) || [])[0] || '';
+    const compName = { 'tm65': 'TM65', 'tm 65': 'TM65', 'tm16': 'TM16', 'tm 16': 'TM16', 'tm21': 'TM21', 'tm 21': 'TM21', 'tm31': 'TM31', 'tm 31': 'TM31', 'bock': 'Bock', 'bitzer': 'Bitzer', 'valeo': 'Valeo' }[comp] || '';
+    if (compName) {
+      f.refaccion = 'Embrague para compresor ' + compName;
+      f._pendiente = 'embragueTipo';
+      return { reply: '¿El embrague es con bobina? ¿La polea es 2A o 2B?', solicitud: null, close: false };
     }
   }
 
@@ -333,7 +367,8 @@ function handleMessage(conv, msg) {
   if (!f.nombre) {
     f._pideNombre = true;
     // Si preguntó precio, no se le repite su pregunta: se nombra la pieza.
-    const que = asksPrice(text) ? (f.refaccion || 'la refacción') : (f.pedido || f.refaccion || 'la refacción');
+    // Para el embrague se nombra el tipo ya definido, no el pedido genérico.
+    const que = asksPrice(text) ? (f.refaccion || 'la refacción') : ((f.refaccion && /embrague/i.test(f.refaccion)) ? f.refaccion : (f.pedido || f.refaccion || 'la refacción'));
     return { reply: 'Claro, con gusto tomo su solicitud de ' + que + (f.equipo ? ' para ' + f.equipo : '') + '. ¿Me dice su nombre para registrarla?', solicitud: null, close: false };
   }
   // Regla del usuario 2026-11-12: si la refacción ya quedó clara (nombre o
@@ -342,7 +377,7 @@ function handleMessage(conv, msg) {
   // el número de parte ni los datos de la refacción (p. ej. solo manda foto).
   // Resumen para el aviso: lo que pidió el cliente con sus palabras, más
   // el código/variante que se resolvió (p. ej. TOEX-E0647) si no venía ahí.
-  let detalle = f.pedido || f.refaccion || 'refacción';
+  let detalle = (f.refaccion && /embrague/i.test(f.refaccion)) ? f.refaccion : (f.pedido || f.refaccion || 'refacción');
   const cod = (f.refaccion || '').match(/\(([^)]+)\)/);
   if (cod && detalle && !detalle.toLowerCase().includes(cod[1].toLowerCase().split(' / ')[0])) detalle += ' (' + cod[1] + ')';
   const resumen = (f.nombre ? f.nombre + ' busca ' : 'Cliente busca ') + detalle + (f.equipo ? ' para ' + f.equipo : '');
@@ -371,6 +406,8 @@ function askAmb(conv, pregunta, text) {
   else if (pregunta.includes('agarres')) kind = 'bosch150';
   else if (pregunta.includes('abanico')) kind = 'condensador';
   else if (pregunta.includes('¿Para qué equipo es la válvula')) kind = 'valvulaEquipo';
+  else if (pregunta.includes('¿Para qué compresor es el embrague')) kind = 'embragueCompresor';
+  else if (pregunta.includes('¿El embrague es con bobina')) kind = 'embragueTipo';
   else if (pregunta.includes('válvula de oring')) kind = 'valvula';
   else if (pregunta.includes('válvula de expansión')) kind = 'valvula';
   else if (pregunta.includes('ventilador del condensador')) kind = 'ventilador2';

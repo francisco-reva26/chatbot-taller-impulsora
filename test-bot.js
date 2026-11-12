@@ -117,6 +117,23 @@ c = conv();
 r = say(c, 'necesito un ventilador');
 check('ventilador genérico pregunta condensador o evaporador', r.reply && /condensador/i.test(r.reply) && /evaporador/i.test(r.reply), r.reply);
 
+// 4h. Embrague: primero el compresor, luego el tipo (bobina / polea)
+c = conv();
+r = say(c, 'ocupo un embrague');
+check('embrague genérico pregunta para qué compresor', r.reply && /compresor/i.test(r.reply) && /TM65/.test(r.reply), r.reply);
+r = say(c, 'TM65');
+check('embrague TM65 pregunta tipo (bobina / polea)', r.reply && /bobina/i.test(r.reply) && /2A/.test(r.reply), r.reply);
+r = say(c, 'con bobina, polea 2A');
+check('embrague con tipo pide nombre', r.reply && /nombre/i.test(r.reply), r.reply);
+r = say(c, 'Pedro Gómez');
+check('embrague TM65 con bobina polea 2A canaliza', !!r.solicitud && /Embrague para compresor TM65 con bobina, polea 2A/.test(r.solicitud.resumen || ''), JSON.stringify(r.solicitud && r.solicitud.resumen));
+c = conv();
+r = say(c, 'ocupo un embrague para Bock');
+check('embrague para Bock pregunta tipo directo', r.reply && /bobina/i.test(r.reply), r.reply);
+r = say(c, 'sin bobina');
+r = say(c, 'Pedro Gómez');
+check('embrague Bock sin bobina canaliza', !!r.solicitud && /Embrague para compresor Bock sin bobina/.test(r.solicitud.resumen || ''), JSON.stringify(r.solicitud && r.solicitud.resumen));
+
 // 5. Filtro 304 ambiguo
 c = conv();
 r = say(c, 'ocupo un filtro 304 para CC355');
