@@ -179,6 +179,59 @@ check('producto 100BXS del Excel se encuentra', p && p.product.codigo === '100BX
 const p2 = bot.findProduct('banda bx 100 sencilla gates');
 check('producto por nombre se encuentra', !!p2, JSON.stringify(p2));
 
+// 13. Factura (oficina): nombre, empresa, qué necesitan; la atiende Francisco
+c = conv();
+r = say(c, 'Hola, tengo una duda de una factura');
+check('factura pide nombre', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'Juan Pérez');
+check('factura con nombre pide empresa', r.reply && /empresa/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'Transportes Ruiz');
+check('factura con empresa pregunta qué necesitan', r.reply && /necesita/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'que me la manden por correo');
+check('factura canaliza como factura para Francisco', !!r.solicitud && r.solicitud.tipo === 'factura' && r.solicitud.atiende === 'Francisco' && /Transportes Ruiz/.test(r.solicitud.resumen), JSON.stringify(r.solicitud));
+
+// 13a. Factura con la necesidad ya dicha: tras la empresa canaliza directo
+c = conv();
+r = say(c, 'Hola, me pueden mandar la factura');
+r = say(c, 'Juan Pérez');
+r = say(c, 'Transportes Ruiz');
+check('factura con necesidad ya dicha canaliza tras la empresa', !!r.solicitud && r.solicitud.tipo === 'factura' && r.solicitud.atiende === 'Francisco', JSON.stringify(r.solicitud));
+
+// 13b. Factura con todo en un mensaje canaliza directo
+c = conv();
+r = say(c, 'Hola soy Juan Pérez, empresa Transportes Ruiz, me pueden mandar la factura');
+check('factura completa en un mensaje canaliza', !!r.solicitud && r.solicitud.tipo === 'factura' && r.solicitud.atiende === 'Francisco', JSON.stringify(r.solicitud));
+
+// 13c. Guía y pago: se canalizan para Héctor
+c = conv();
+r = say(c, 'me mandas la guía del envío a Monterrey');
+check('guía con detalle pide nombre', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'Juan Pérez');
+check('guía canaliza para Héctor', !!r.solicitud && r.solicitud.tipo === 'guia' && r.solicitud.atiende === 'Héctor' && /Monterrey/.test(r.solicitud.resumen), JSON.stringify(r.solicitud));
+c = conv();
+r = say(c, 'pago');
+check('pago solo pide nombre', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'el pago de la factura 123 por $5,000');
+check('pago: el detalle no se pierde al contestar el nombre', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'Juan Pérez');
+check('pago canaliza para Héctor con el detalle', !!r.solicitud && r.solicitud.tipo === 'pago' && r.solicitud.atiende === 'Héctor' && /123/.test(r.solicitud.resumen), JSON.stringify(r.solicitud));
+
+// 13d. Garantía: equipo, pieza, cuándo se instaló y qué falla; Manuel primero
+c = conv();
+r = say(c, 'tengo una garantía de un compresor TM65 para CC450');
+check('garantía pide nombre', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'Juan Pérez');
+check('garantía con nombre pregunta cuándo se instaló y qué falla', r.reply && /instaló|falla/i.test(r.reply) && !r.solicitud, r.reply);
+r = say(c, 'se instaló en mayo y ya no enfría');
+check('garantía canaliza para Manuel', !!r.solicitud && r.solicitud.tipo === 'garantia' && r.solicitud.atiende === 'Manuel' && /CC450/.test(r.solicitud.resumen), JSON.stringify(r.solicitud));
+
+// 13e. Saludo primero y luego factura: el intent cambia
+c = conv();
+r = say(c, 'hola');
+check('hola solo saluda sin canalizar', !r.solicitud, JSON.stringify(r));
+r = say(c, 'me mandan la factura por favor');
+check('factura tras saludo cambia el intent y pide nombre', r.reply && /nombre/i.test(r.reply) && !/refacción/i.test(r.reply), r.reply);
+
 // 12. Nunca pedir placa en ningún flujo
 c = conv();
 for (const t of ['necesito una refacción', '¿ya quedó mi camión?', 'ocupo un servicio de instalación']) {

@@ -19,6 +19,11 @@
 //    parar y avisar al usuario (ver server.js).
 //  - Sin método de pago: el bot solo responde dentro de la ventana de
 //    24 h que abre el mensaje del cliente. Nunca inicia conversación.
+//  - Factura (oficina): pedir nombre, empresa y qué necesitan de la
+//    factura; la atiende Francisco. Guía o pago: canalizar para Héctor
+//    (office boy). Garantía: pedir equipo, pieza, cuándo se instaló y
+//    qué falla; la atiende Manuel primero. En los tres casos nunca se
+//    promete un monto, una fecha ni que la garantía procede.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -146,6 +151,10 @@ function detectIntent(text) {
   const t = norm(text);
   if (/\b(ya quedo|ya quedó|quedo mi|quedó mi|estatus|estado de|como va|cuando queda|cuándo queda|mi unidad|mi camion|mi camión|esta lista|está lista|esta listo|está listo)\b/.test(t)) return 'estatus';
   if (/\b(proveedor|ofrezco|les ofrezco|les vendo|vendo|tengo para vender|distribuidor|soy proveedor)\b/.test(t)) return 'proveedor';
+  if (/\bfactur/.test(t)) return 'factura';
+  if (/\bgarant/.test(t)) return 'garantia';
+  if (/\b(guia|guias|numero de guia|rastreo|seguimiento de envio)\b/.test(t)) return 'guia';
+  if (/\b(pago|pagos|pagar|deposito|transferencia|abono|cuanto debo|saldo pendiente)\b/.test(t)) return 'pago';
   if (/\b(servicio|reparacion|reparación|instalar|instalacion|instalación|reparar|no enfria|no enfría|no funciona el clima|falla el clima)\b/.test(t)) return 'servicio';
   return 'refaccion';
 }
@@ -165,7 +174,7 @@ function isGreeting(text) {
 // --- Estado de conversación ----------------------------------------------
 // fields: { nombre, empresa, ruta, numeroUnidad, chasis, equipo, refaccion,
 //           falla, tipo, foto (mediaId), producto }
-// intent: refaccion | estatus | servicio | proveedor
+// intent: refaccion | estatus | servicio | proveedor | factura | garantia | guia | pago
 function newConversation(waId) {
   return { waId, intent: null, fields: {}, cerrada: false, cerradaAt: null,
            lastClientAt: null, createdAt: new Date().toISOString(), replies: 0 };
@@ -191,8 +200,22 @@ function handleMessage(conv, msg) {
   }
   if (!text && !hasPhoto) return { reply: null, solicitud: null, close: false };
 
+  const intentAntes = conv.intent;
   if (!conv.intent) conv.intent = detectIntent(text);
   const f = conv.fields;
+  // Si la conversación empezó con un saludo, el intent quedó en
+  // 'refaccion'; si el siguiente mensaje es claramente de otro tema
+  // (factura, garantía, guía, pago, estatus, servicio, proveedor),
+  // cambiar al intent correcto. No se cambia mientras haya una pregunta
+  // de desambiguación pendiente.
+  if (conv.intent === 'refaccion' && !f._pendiente) {
+    const ni = detectIntent(text);
+    if (ni !== 'refaccion') conv.intent = ni;
+  }
+  // true cuando el intent se detectó en este mismo mensaje: solo entonces
+  // se toman los datos que el cliente ya dio en ese mensaje; en las
+  // respuestas siguientes solo se toman las respuestas a las preguntas.
+  const intentNuevo = conv.intent !== intentAntes;
 
   // Guardar lo que el cliente pidió con sus propias palabras (p. ej.
   // "sello para tm65"): es lo que debe llegar en el aviso a almacén, no el
@@ -318,6 +341,78 @@ function handleMessage(conv, msg) {
     return fin(conv, { reply: CANALIZAR_MSG, solicitud: sol, close: true });
   }
 
+  // --- Factura (oficina): nombre, empresa y qué necesitan de la factura.
+  // La atiende Francisco (oficina); nunca se da ni se promete un monto.
+  if (conv.intent === 'factura') {
+    if (f._pideEmpresa && text) {
+      const e = text.replace(/^(la empresa es|es|de|para)\s+/i, '').trim();
+      if (e.length >= 2) { f.empresa = e.slice(0, 60); delete f._pideEmpresa; }
+    }
+    if (f._pideNecesidad && text) {
+      f.facturaNecesidad = text.trim().slice(0, 120); delete f._pideNecesidad;
+    }
+    // Qué necesitan y empresa, si ya lo dijeron en el mensaje que abrió
+    // el tema (o al contestar el nombre con algo más que el nombre).
+    if (!f.facturaNecesidad && text && (intentNuevo || f._pideNombre) && /\b(mandar|manden|enviar|envien|reenviar|reenvien|correccion|corregir|nueva|nuevo|folio|reimprimir)\b/.test(norm(text))) {
+      f.facturaNecesidad = text.replace(/^(hola|buenas tardes|buenas noches|buenos d[ií]as|qué tal|que tal|buenas)[,\s]*/i, '').trim().slice(0, 120);
+    }
+    if (!f.empresa && text && (intentNuevo || f._pideNombre)) {
+      const m = text.match(/empresa[:\s]+([A-Za-z0-9 .&\-]{2,60})/i);
+      if (m) f.empresa = m[1].trim();
+    }
+    if (!f.nombre) { f._pideNombre = true; return { reply: 'Claro, ¿me dice su nombre para registrar la solicitud de la factura?', solicitud: null, close: false }; }
+    if (!f.empresa) { f._pideEmpresa = true; return { reply: 'Gracias, ' + f.nombre + '. ¿De qué empresa es la factura?', solicitud: null, close: false }; }
+    if (!f.facturaNecesidad) { f._pideNecesidad = true; return { reply: '¿Qué necesita de la factura: que se la manden, una corrección o una factura nueva?', solicitud: null, close: false }; }
+    const sol = buildSolicitud(conv, 'factura', 'Factura (oficina): ' + f.nombre + ' — ' + f.empresa + ' — ' + f.facturaNecesidad, { atiende: 'Francisco', para: ['6671181767'] });
+    return fin(conv, { reply: CANALIZAR_MSG, solicitud: sol, close: true });
+  }
+
+  // --- Guía o pago: se canaliza para Héctor (office boy). Solo se toman
+  // los datos; nunca se promete fecha de entrega ni monto.
+  if (conv.intent === 'guia' || conv.intent === 'pago') {
+    const esGuia = conv.intent === 'guia';
+    if (f._pideDetalle && text) {
+      f.detalle = text.trim().slice(0, 140); delete f._pideDetalle;
+    }
+    // Detalle si ya lo dijeron en el mensaje que abrió el tema (o al
+    // contestar el nombre con algo más que el nombre).
+    if (!f.detalle && text && (intentNuevo || f._pideNombre)) {
+      const limpio = norm(text).replace(/^(hola|buenas tardes|buenas noches|buenos dias|que tal|buenas)\s*/, '').replace(/\b(guia|guias|pago|pagos)\b/g, '').replace(/\s+/g, ' ').trim();
+      if (limpio.split(' ').filter(Boolean).length >= 2) f.detalle = text.replace(/^(hola|buenas tardes|buenas noches|buenos d[ií]as|qué tal|que tal|buenas)[,\s]*/i, '').trim().slice(0, 140);
+    }
+    if (!f.nombre) { f._pideNombre = true; return { reply: 'Claro, ¿me dice su nombre para registrarlo?', solicitud: null, close: false }; }
+    if (!f.detalle) {
+      f._pideDetalle = true;
+      return { reply: esGuia ? '¿De qué guía es? Dígame el número de guía o qué se envió y para quién.' : '¿De qué pago es? Dígame el monto o el folio, o para qué es el pago.', solicitud: null, close: false };
+    }
+    const sol = buildSolicitud(conv, esGuia ? 'guia' : 'pago', (esGuia ? 'Guía (para Héctor): ' : 'Pago (para Héctor): ') + f.nombre + ' — ' + f.detalle, { atiende: 'Héctor', para: ['6671181767'] });
+    return fin(conv, { reply: CANALIZAR_MSG, solicitud: sol, close: true });
+  }
+
+  // --- Garantía: equipo, pieza, cuándo se instaló y qué falla. La
+  // atiende Manuel primero, como las demás solicitudes. Nunca se promete
+  // que la garantía procede ni un plazo.
+  if (conv.intent === 'garantia') {
+    if (f._pideRefaccion && text) {
+      if (!f.refaccion) f.refaccion = text.trim().slice(0, 120);
+      delete f._pideRefaccion;
+    }
+    if (f._pideDetalle && text) {
+      f.detalle = text.trim().slice(0, 140); delete f._pideDetalle;
+    }
+    // Detalle si ya lo dijeron en el mensaje que abrió el tema (o al
+    // contestar el nombre con algo más que el nombre).
+    if (!f.detalle && text && (intentNuevo || f._pideNombre) && /\b(instal|fall|no enfria|dejo de|dejó de|ya no|se descompuso|se dano|se daño)\b/.test(norm(text))) {
+      f.detalle = text.replace(/^(hola|buenas tardes|buenas noches|buenos d[ií]as|qué tal|que tal|buenas)[,\s]*/i, '').trim().slice(0, 140);
+    }
+    if (!f.equipo) return { reply: 'Claro, ¿para qué equipo es la garantía? Valeo, Spheros CC450, CC355 o Eberspächer, o mándeme una foto.', solicitud: null, close: false };
+    if (!f.refaccion) { f._pideRefaccion = true; return { reply: '¿Qué pieza es la de la garantía?', solicitud: null, close: false }; }
+    if (!f.nombre) { f._pideNombre = true; return { reply: '¿Me dice su nombre para registrar la garantía?', solicitud: null, close: false }; }
+    if (!f.detalle) { f._pideDetalle = true; return { reply: '¿Cuándo se instaló la pieza y qué falla presenta?', solicitud: null, close: false }; }
+    const sol = buildSolicitud(conv, 'garantia', 'Garantía: ' + f.nombre + ' — ' + f.equipo + ' — ' + f.refaccion + ' — ' + f.detalle, { atiende: 'Manuel' });
+    return fin(conv, { reply: CANALIZAR_MSG, solicitud: sol, close: true });
+  }
+
   // --- Estatus: pedir localizadores (nunca placa) y contestar por la nota
   if (conv.intent === 'estatus') {
     if (!f.nombre) { f._pideNombre = true; return { reply: 'Claro, ¿me dice su nombre y la empresa, ruta, número de camión o chasis de la unidad para localizarla?', solicitud: null, close: false }; }
@@ -415,12 +510,17 @@ function askAmb(conv, pregunta, text) {
   return { reply: pregunta, solicitud: null, close: false };
 }
 
-function buildSolicitud(conv, tipo, resumen) {
+function buildSolicitud(conv, tipo, resumen, opts) {
+  const o = opts || {};
   return {
     id: 'SOL-' + Date.now().toString(36).toUpperCase(),
     waId: conv.waId,
     tipo,
     resumen,
+    // Quién atiende la solicitud: 'Manuel' (refacción, servicio, estatus,
+    // proveedor y garantía), 'Francisco' (factura, oficina) o 'Héctor'
+    // (guía o pago). Luna lo usa para el aviso.
+    atiende: o.atiende || 'Manuel',
     fields: { ...conv.fields },
     estado: 'nueva',
     creadaAt: new Date().toISOString(),
@@ -429,7 +529,7 @@ function buildSolicitud(conv, tipo, resumen) {
     // mandarles un mensaje de WhatsApp iniciado por el bot (eso sería una
     // plantilla, de pago). La solicitud queda en la bandeja (/inbox) y en
     // el registro, para que Luna la avise por el canal habitual.
-    aviso: { via: 'bandeja', estado: 'pendiente', para: ['6671181767', '6674603088'] },
+    aviso: { via: 'bandeja', estado: 'pendiente', para: o.para || ['6671181767', '6674603088'] },
   };
 }
 
