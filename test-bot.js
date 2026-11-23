@@ -8,7 +8,7 @@ function check(name, cond, extra) {
   else { fail++; console.log('  FALLA ' + name + (extra ? ' — ' + extra : '')); }
 }
 function conv() { return bot.newConversation('5216670000000'); }
-function say(c, text, imageId) { return bot.handleMessage(c, { text, imageId: imageId || null }); }
+function say(c, text, imageId, extra) { return bot.handleMessage(c, { text, imageId: imageId || null, ...(extra || {}) }); }
 const NO_PRICE = (s) => s && !/\$\s?\d|precio|costo|cuesta|vale\s+\$/.test(s.toLowerCase());
 const NO_PLACA = (s) => s && !/placa/i.test(s);
 const NO_NAMES = (s) => s && !/francisco|manuel/i.test(s);
@@ -238,6 +238,49 @@ for (const t of ['necesito una refacción', '¿ya quedó mi camión?', 'ocupo un
   r = say(conv(), t);
   check('flujo "' + t + '" no pide placa', !r.reply || NO_PLACA(r.reply), r.reply);
 }
+
+// 14. Fluido, no robótico (caso Beto Cornejo, 2026-11-23)
+c = conv();
+r = say(c, 'hola');
+check('saludo se contesta corto, sin cuestionario', r.reply === 'Hola, ¿en qué le ayudo?' && !r.solicitud, r.reply);
+r = say(c, 'necesito un compresor TM65');
+check('tras el saludo la refacción se toma normal', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+
+// 14b. Respuesta de proveedor con precio: el bot no contesta nada
+c = conv();
+r = say(c, 'SI TENGO 2921.24 MAS IVA');
+check('respuesta de proveedor con precio no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'si tengo, $2,921.24 mas iva');
+check('respuesta de proveedor con $ no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'les ofrezco compresores a 2921.24 mas iva');
+check('oferta nueva de proveedor sí se canaliza', !!r.solicitud && r.solicitud.tipo === 'proveedor', JSON.stringify(r.solicitud));
+
+// 14c. Respuesta a un mensaje de una persona del taller, sin solicitud: silencio
+c = conv();
+r = say(c, 'BUENOS DIAS SR', null, { replyToHuman: true });
+check('saludo respondiendo a humano no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'ok gracias', null, { replyToHuman: true });
+check('gracias respondiendo a humano no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'ocupo un compresor TM65', null, { replyToHuman: true });
+check('solicitud respondiendo a humano sí se atiende', r.reply && /nombre/i.test(r.reply) && !r.solicitud, r.reply);
+c = conv();
+r = say(c, 'hola', null, { replyToHuman: false });
+check('saludo respondiendo al bot sí se contesta corto', r.reply === 'Hola, ¿en qué le ayudo?', r.reply);
+
+// 14d. La pregunta por la pieza no se repite igual
+c = conv();
+r = say(c, 'algo');
+check('primera pregunta por la pieza, variante 1', r.reply && /¿Qué pieza busca\?/.test(r.reply), r.reply);
+r = say(c, 'no sé');
+check('segunda pregunta por la pieza, variante 2', r.reply && /foto de la pieza o me dice el código/.test(r.reply), r.reply);
+r = say(c, 'mm');
+check('tercera vez: queda al pendiente sin insistir', r.reply && /Quedo al pendiente/.test(r.reply), r.reply);
+r = say(c, 'eh');
+check('cuarta vez: ya no insiste, silencio', r.reply === null && !r.solicitud, JSON.stringify(r));
 
 console.log(`\n${pass} pasaron, ${fail} fallaron`);
 process.exit(fail ? 1 : 0);

@@ -56,6 +56,10 @@ let solicitudes = load('solicitudes.json', []);
 let usage = load('usage.json', { month: '', replies: 0 });
 let units = load('units.json', []);
 let alerts = load('alerts.json', []);
+// IDs de los mensajes que mandó el bot (para saber si el cliente responde
+// a un mensaje del bot o a uno que mandó una persona del taller).
+let sentIds = load('sent_ids.json', []);
+const BUSINESS_WAID = '526671316147'; // número del taller en WhatsApp
 
 function monthKey() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit' }).format(new Date());
@@ -97,6 +101,8 @@ async function sendWhatsApp(to, body, conv) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { logLine({ event: 'send_error', to, status: res.status, data }); return { ok: false, error: data }; }
+  const sentId = data.messages && data.messages[0] && data.messages[0].id;
+  if (sentId) { sentIds.push(sentId); sentIds = sentIds.slice(-200); save('sent_ids.json', sentIds); }
   usageThisMonth().replies++; save('usage.json', usage);
   logLine({ event: 'sent', to, id: data.messages && data.messages[0] && data.messages[0].id });
   return { ok: true, id: data.messages && data.messages[0] && data.messages[0].id };
@@ -119,9 +125,15 @@ async function processMessage(msg) {
   const text = type === 'text' ? (msg.text && msg.text.body || '') : (msg.caption || '');
   const imageId = type === 'image' ? (msg.image && msg.image.id) : null;
   if (imageId) downloadMedia(imageId);
+  // Contexto de respuesta: si el mensaje cita uno del negocio, saber si
+  // ese mensaje lo mandó el bot (se contesta normal) o una persona del
+  // taller (el bot no interrumpe si no trae solicitud clara).
+  const ctx = msg.context || null;
+  const replyToBot = !!(ctx && ctx.id && sentIds.includes(ctx.id));
+  const replyToHuman = !!(ctx && ctx.from === BUSINESS_WAID && !replyToBot);
   if (!conversations[waId]) conversations[waId] = bot.newConversation(waId);
   const conv = conversations[waId];
-  const result = bot.handleMessage(conv, { text, imageId });
+  const result = bot.handleMessage(conv, { text, imageId, replyToHuman });
   if (result.action === 'lookup_status') {
     const unit = bot.findUnit(units, result.fields || conv.fields);
     const reply = bot.statusReply(unit);

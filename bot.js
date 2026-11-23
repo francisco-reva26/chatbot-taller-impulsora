@@ -19,11 +19,17 @@
 //    parar y avisar al usuario (ver server.js).
 //  - Sin método de pago: el bot solo responde dentro de la ventana de
 //    24 h que abre el mensaje del cliente. Nunca inicia conversación.
-//  - Factura (oficina): pedir nombre, empresa y qué necesitan de la
-//    factura; la atiende Francisco. Guía o pago: canalizar para Héctor
-//    (office boy). Garantía: pedir equipo, pieza, cuándo se instaló y
-//    qué falla; la atiende Manuel primero. En los tres casos nunca se
-//    promete un monto, una fecha ni que la garantía procede.
+//  - Fluido, no robótico (2026-11-23, caso Beto Cornejo): el bot solo
+//    habla cuando el mensaje es claramente una solicitud que puede
+//    atender. Un saludo se contesta con un saludo corto, nunca con el
+//    cuestionario completo. La pregunta por la pieza se hace en dos
+//    variantes y no se repite igual; si el cliente sigue sin aclarar,
+//    se le dice que se queda al pendiente y ya no se insiste. Si el
+//    mensaje es la respuesta de un proveedor (precio o disponibilidad,
+//    p. ej. "SI TENGO 2921.24 MAS IVA"), el bot no contesta nada: esa
+//    respuesta es para la persona que preguntó. Si el mensaje responde
+//    a uno que mandó una persona del taller (no el bot) y no trae una
+//    solicitud clara, tampoco contesta: la persona ya está atendiendo.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -171,6 +177,34 @@ function isGreeting(text) {
   return /^(hola|buenas|buenos dias|buenas tardes|buenas noches|que tal|qué tal)\b/.test(norm(text));
 }
 
+// Respuesta de un proveedor a una pregunta que hizo una persona del
+// taller (precio o disponibilidad, p. ej. "SI TENGO 2921.24 MAS IVA"):
+// el bot no contesta nada, esa respuesta ya la ve la persona que
+// preguntó. Una oferta nueva ("les ofrezco...") NO es esto: sí se canaliza.
+function isSupplierAnswer(text) {
+  const t = norm(text);
+  if (/\b(ofrezco|les ofrezco|vendo|les vendo|distribuidor|soy proveedor|tengo para vender)\b/.test(t)) return false;
+  if (/\bmas iva\b/.test(t)) return true;
+  if (/\$\s?\d/.test(t)) return true;
+  if (/\d[\d,]*\.\d{2}\b/.test(t)) return true;
+  // "tengo 50 piezas": un número suelto (no pegado a un código como CC450).
+  if (/\b(si tengo|tengo|hay|cuenta con)\b/.test(t) && /\b\d{2,}\b/.test(t)) return true;
+  return false;
+}
+
+// ¿El mensaje trae una solicitud clara? Un saludo, un "gracias" o un
+// "ok" no la trae; un equipo, una pieza, un código o un intent distinto
+// de refacción sí.
+function hasSubstance(text) {
+  if (!text) return false;
+  if (detectIntent(text) !== 'refaccion') return true;
+  if (findKb(text).length) return true;
+  if (findProduct(text)) return true;
+  if (/\d{3,}/.test(text)) return true;
+  if (norm(text).split(' ').filter(Boolean).length > 4) return true;
+  return false;
+}
+
 // --- Estado de conversación ----------------------------------------------
 // fields: { nombre, empresa, ruta, numeroUnidad, chasis, equipo, refaccion,
 //           falla, tipo, foto (mediaId), producto }
@@ -199,6 +233,14 @@ function handleMessage(conv, msg) {
     if (nombreRegistrado) conv.fields.nombre = nombreRegistrado;
   }
   if (!text && !hasPhoto) return { reply: null, solicitud: null, close: false };
+
+  // Fluido, no robótico: si el mensaje es la respuesta de un proveedor
+  // (precio/disponibilidad), no contestar: es para quien preguntó.
+  if (text && isSupplierAnswer(text)) return { reply: null, solicitud: null, close: false };
+  // Si el mensaje responde a uno que mandó una persona del taller (no el
+  // bot) y no trae una solicitud clara, no interrumpir: esa persona ya
+  // está atendiendo la conversación.
+  if (text && msg.replyToHuman && !hasSubstance(text)) return { reply: null, solicitud: null, close: false };
 
   const intentAntes = conv.intent;
   if (!conv.intent) conv.intent = detectIntent(text);
@@ -433,7 +475,7 @@ function handleMessage(conv, msg) {
   // --- Refacción (flujo principal)
   if (asksPrice(text)) {
     // No se da precio; se sigue tomando la solicitud.
-    if (!f.equipo && !f.refaccion) return { reply: SIN_PRECIO_MSG + ' ¿Para qué equipo es la refacción? Valeo, Spheros CC450, CC355 o Eberspächer, o mándeme una foto de la pieza.', solicitud: null, close: false };
+    if (!f.equipo && !f.refaccion) return { reply: SIN_PRECIO_MSG + ' ¿Qué pieza es? Me dice el equipo y el código, o me manda una foto.', solicitud: null, close: false };
   }
   const amb = ambiguousQuestion(text);
   if (amb && !f.refaccion) return askAmb(conv, amb, text);
@@ -448,12 +490,20 @@ function handleMessage(conv, msg) {
     }
   }
   if (!f.refaccion && !hasPhoto) {
-    if (isGreeting(text)) return { reply: 'Hola, ¿qué refacción busca? Dígame el equipo (Valeo, Spheros CC450, CC355 o Eberspächer) y la pieza o el código, o mándeme una foto de la pieza.', solicitud: null, close: false };
-    return { reply: '¿Qué refacción busca? Dígame el equipo y la pieza o el código, o mándeme una foto de la pieza.', solicitud: null, close: false };
+    // Un saludo se contesta con un saludo corto, nunca con el cuestionario.
+    if (isGreeting(text)) return { reply: 'Hola, ¿en qué le ayudo?', solicitud: null, close: false };
+    // La pregunta por la pieza no se repite igual: dos variantes y luego
+    // se deja de insistir (la persona de almacén puede tomar la charla).
+    const n = f._preguntoPieza || 0;
+    f._preguntoPieza = n + 1;
+    if (n === 0) return { reply: '¿Qué pieza busca? Me dice el equipo y el código, o me manda una foto de la pieza.', solicitud: null, close: false };
+    if (n === 1) return { reply: '¿Me manda una foto de la pieza o me dice el código que trae?', solicitud: null, close: false };
+    if (n === 2) return { reply: 'Quedo al pendiente, en cuanto me diga la pieza o me mande una foto le tomo la solicitud.', solicitud: null, close: false };
+    return { reply: null, solicitud: null, close: false };
   }
   // Foto sin datos de la pieza: ahí sí se pregunta el equipo.
   if (f.refaccion === 'foto de la pieza' && !f.equipo) {
-    return { reply: 'Ya recibí la foto. ¿Para qué equipo es la pieza? Valeo, Spheros CC450, CC355 o Eberspächer.', solicitud: null, close: false };
+    return { reply: 'Ya tengo la foto, ¿para qué equipo es la pieza?', solicitud: null, close: false };
   }
   // Número no registrado (sin nombre): pedir el nombre del cliente antes
   // de canalizar, para que la solicitud llegue con quién la pide.
