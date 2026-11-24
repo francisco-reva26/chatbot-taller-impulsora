@@ -282,5 +282,41 @@ check('tercera vez: queda al pendiente sin insistir', r.reply && /Quedo al pendi
 r = say(c, 'eh');
 check('cuarta vez: ya no insiste, silencio', r.reply === null && !r.solicitud, JSON.stringify(r));
 
+// 15. Caso Héctor Imconsa: el bot no se mete en charlas de persona a persona
+c = conv();
+r = say(c, 'buen dia si claro');
+check('buen dia si claro no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'mande');
+check('mande no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, '?');
+check('? solo no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'buen dia');
+check('buen dia solo sí se saluda corto', r.reply === 'Hola, ¿en qué le ayudo?', r.reply);
+c = conv();
+r = say(c, 'si, el compresor TM65');
+check('sí con solicitud sí se atiende', r.reply && /nombre/i.test(r.reply), r.reply);
+c = conv();
+r = say(c, 'creo que se equivoco amigo');
+check('número equivocado: se disculpa y cierra', r.reply && /Disculpe/.test(r.reply) && r.close, JSON.stringify(r));
+c = conv();
+r = say(c, 'me equivoqué de pieza, era el sensor');
+check('me equivoqué de pieza no es número equivocado', r.reply && !/Disculpe/.test(r.reply || ''), r.reply);
+c = conv();
+r = say(c, 'ocupo un embrague');
+r = say(c, 'TM65');
+r = say(c, 'sí');
+check('sí contestando al bot no se queda callado', r.reply !== null && !r.solicitud, JSON.stringify(r));
+// Secuencia completa de Héctor: tres mensajes seguidos, cero respuestas del bot
+c = conv();
+r = say(c, 'buen dia si claro');
+check('Héctor 1: silencio', r.reply === null, JSON.stringify(r));
+r = say(c, 'mande');
+check('Héctor 2: silencio', r.reply === null, JSON.stringify(r));
+r = say(c, '?');
+check('Héctor 3: silencio', r.reply === null, JSON.stringify(r));
+
 console.log(`\n${pass} pasaron, ${fail} fallaron`);
 process.exit(fail ? 1 : 0);

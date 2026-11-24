@@ -30,6 +30,11 @@
 //    respuesta es para la persona que preguntó. Si el mensaje responde
 //    a uno que mandó una persona del taller (no el bot) y no trae una
 //    solicitud clara, tampoco contesta: la persona ya está atendiendo.
+//  - Más de lo mismo (2026-11-24, caso Héctor Imconsa): un "buen día sí
+//    claro", un "mande" o un "?" tampoco son solicitudes: son respuestas
+//    a algo que preguntó una persona. El bot se queda callado, salvo que
+//    esté esperando una respuesta a su propia pregunta. Si le dicen que
+//    se equivocó de número, se disculpa y cierra la conversación.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -174,7 +179,7 @@ function isFarewell(text) {
 }
 
 function isGreeting(text) {
-  return /^(hola|buenas|buenos dias|buenas tardes|buenas noches|que tal|qué tal)\b/.test(norm(text));
+  return /^(hola|buenas|buenos dias|buen dia|buenas tardes|buenas noches|que tal|qué tal)\b/.test(norm(text));
 }
 
 // Respuesta de un proveedor a una pregunta que hizo una persona del
@@ -203,6 +208,18 @@ function hasSubstance(text) {
   if (/\d{3,}/.test(text)) return true;
   if (norm(text).split(' ').filter(Boolean).length > 4) return true;
   return false;
+}
+
+// Un "sí claro", "mande", "ok" o un "?" no es una solicitud: es la
+// respuesta a algo que preguntó una persona del taller. Un saludo solo
+// ("hola", "buen día") NO es esto: eso se contesta con un saludo corto.
+function isAck(text) {
+  const t = norm(text);
+  if (!t) return true; // solo puntuación o emoji
+  if (/^(buen dia|buenos dias|buenas tardes|buenas noches)\s+(si|claro)\b/.test(t)) return true;
+  const words = t.split(' ').filter(Boolean);
+  if (words.length > 3) return false;
+  return /^(si|sí|si claro|sí claro|claro|claro que si|ok|va|sale|mande|digame|dígame|enterado|de acuerdo|perfecto|gracias|muchas gracias|con gusto|a sus ordenes|correcto|asi es)\b/.test(t);
 }
 
 // --- Estado de conversación ----------------------------------------------
@@ -237,6 +254,11 @@ function handleMessage(conv, msg) {
   // Fluido, no robótico: si el mensaje es la respuesta de un proveedor
   // (precio/disponibilidad), no contestar: es para quien preguntó.
   if (text && isSupplierAnswer(text)) return { reply: null, solicitud: null, close: false };
+  // Si le dicen que se equivocó de número, disculparse y cerrar: no insistir.
+  if (text && /\b(se equivoco|te equivocaste|numero equivocado|número equivocado|no es (aquí|aqui|este numero|este número))\b/.test(norm(text))) {
+    conv.cerrada = true; conv.cerradaAt = new Date().toISOString();
+    return { reply: 'Disculpe, tiene razón, me equivoqué. Quedo al pendiente.', solicitud: null, close: true };
+  }
   // Si el mensaje responde a uno que mandó una persona del taller (no el
   // bot) y no trae una solicitud clara, no interrumpir: esa persona ya
   // está atendiendo la conversación.
@@ -258,6 +280,12 @@ function handleMessage(conv, msg) {
   // se toman los datos que el cliente ya dio en ese mensaje; en las
   // respuestas siguientes solo se toman las respuestas a las preguntas.
   const intentNuevo = conv.intent !== intentAntes;
+  // Un "sí claro", "mande", "buen día" con afirmación o un "?" no es una
+  // solicitud: es la respuesta a algo que preguntó una persona. No
+  // contestar, salvo que el bot esté esperando una respuesta a su
+  // propia pregunta.
+  const esperaRespuesta = f._pendiente || f._pideNombre || f._pideEmpresa || f._pideNecesidad || f._pideDetalle || f._pideRefaccion;
+  if (text && !esperaRespuesta && isAck(text)) return { reply: null, solicitud: null, close: false };
 
   // Guardar lo que el cliente pidió con sus propias palabras (p. ej.
   // "sello para tm65"): es lo que debe llegar en el aviso a almacén, no el
