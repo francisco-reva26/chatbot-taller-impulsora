@@ -35,6 +35,12 @@
 //    a algo que preguntó una persona. El bot se queda callado, salvo que
 //    esté esperando una respuesta a su propia pregunta. Si le dicen que
 //    se equivocó de número, se disculpa y cierra la conversación.
+//  - Avisos e información (2026-11-28, casos Héctor Imconsa y David
+//    Avalos): un aviso no es una solicitud. Si el mensaje avisa algo
+//    (un cambio de precio, un cierre, un calendario) y no pide nada, el
+//    bot no contesta nada: esa información es para las personas del
+//    taller. Igual para los temas de oficina: la palabra sola ("factura",
+//    "pagos") no es una solicitud; hace falta que la pidan.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -158,20 +164,75 @@ function detectEquipo(text) {
   return null;
 }
 
+// Señales de que el mensaje PIDE algo al taller (no solo lo menciona).
+// Se prueban contra el texto normalizado (sin acentos). La lista FUERTE
+// es para no callar un aviso que además trae un pedido; la AMPLIA
+// (fuerte + preguntas y palabras sueltas) es para los temas de oficina.
+const REQ_STRONG_WORDS = ['necesito', 'solicito', 'quiero', 'ocupo', 'busco', 'me puedes', 'me puede', 'me pueden', 'por favor', 'favor de', 'me mandas', 'me mandan', 'me envias', 'me envian', 'me pasas', 'me falta', 'me facturas', 'me dices', 'me dice', 'me ayudas', 'me urge', 'se puede', 'podrian', 'podria', 'tengo una duda', 'tengo una garantia', 'tengo un pago', 'facturar', 'reimprimir', 'correccion', 'corregir', 'cuanto debo', 'saldo', 'comprobante', 'abono', 'rastreo', 'seguimiento', 'ya pague', 'hice el pago', 'te transfiero', 'pago pendiente', 'falla', 'fallo', 'danado', 'descompuesto', 'no funciona', 'se descompuso', 'no enfria', 'dejo de'];
+const REQ_EXTRA_WORDS = ['cuando', 'donde', 'cuanto', 'nueva', 'nuevo', 'folio', 'me das', 'cuesta', 'vale', 'duda', 'problema'];
+const REQUEST_STRONG = new RegExp('\\b(' + REQ_STRONG_WORDS.join('|') + ')\\b');
+const REQUEST_BROAD = new RegExp('\\b(' + REQ_STRONG_WORDS.concat(REQ_EXTRA_WORDS).join('|') + ')\\b');
+
+// Un aviso o información (no una solicitud): el que escribe está avisando
+// algo al taller (un cambio de precio, un cierre, un calendario), no
+// pidiendo nada. El bot no contesta nada: esa información es para las
+// personas del taller. Una oferta nueva ("les ofrezco...") NO es esto: sí
+// se canaliza. Una pregunta (¿?) o un pedido claro tampoco es esto.
+function isAnnouncement(text) {
+  const t = norm(text);
+  if (!t || text.includes('?')) return false;
+  // "Quiero avisar..." es avisar, no pedir: se quita antes de buscar
+  // señales de pedido.
+  const t2 = t.replace(/quiero avisar(les)?/g, '');
+  if (REQUEST_STRONG.test(t2)) return false;
+  if (/\b(para comentarle|para comentarles|les comento|les aviso|les informo|voy avisando|quiero avisar(les)?|para avisar(les)?|te aviso|para informarle|para informar(les)?|para que sepan|les comparto|cierre de operaciones|regreso a operaciones|ultimo dia de|inventario general|posada|aviso que|informo que|comento que|subira de precio|sube de precio|se respeta)\b/.test(t)) return true;
+  if (/1\)/.test(t) && /2\)/.test(t) && /\b\d{1,2}\/\d{1,2}\b/.test(t)) return true;
+  // "El precio es 5000": precio con un número, sin pedir nada. No aplica
+  // si se pide el precio de una pieza ("precio del compresor TM65", donde
+  // el número es parte del código).
+  if (t.includes('precio') && /\b\d[\d,]*(?:\.\d+)?\b/.test(t) && !/\b(precio del?|cuanto cuesta|cuanto vale|que cuesta|cuanto sale|en cuanto|cuanto es|me das precio|cotiz)\b/.test(t)) return true;
+  return false;
+}
+
+// Pedido claro para los temas de oficina (factura, garantía, guía, pago):
+// la palabra sola no basta. Un aviso informativo ("último día de
+// recepción de facturas", "último día de pagos") no es una solicitud; un
+// pedido ("necesito la factura", "¿cuánto debo?") sí. Un mensaje corto
+// que es básicamente el tema ("factura", "la guía") también se toma
+// como solicitud.
+function isAdminRequest(text, kind) {
+  const t = norm(text);
+  const kw = {
+    factura: /\bfactur/,
+    garantia: /\bgarant/,
+    guia: /\b(guia|guias|numero de guia|rastreo|seguimiento de envio)\b/,
+    pago: /\b(pago|pagos|pagar|deposito|transferencia|abono|cuanto debo|saldo pendiente)\b/,
+  }[kind];
+  if (!kw || !kw.test(t)) return false;
+  if (text.includes('?')) return true;
+  if (REQUEST_BROAD.test(t)) return true;
+  if (t.split(' ').filter(Boolean).length <= 2) return true;
+  return false;
+}
+
 function detectIntent(text) {
   const t = norm(text);
   if (/\b(ya quedo|ya quedó|quedo mi|quedó mi|estatus|estado de|como va|cuando queda|cuándo queda|mi unidad|mi camion|mi camión|esta lista|está lista|esta listo|está listo)\b/.test(t)) return 'estatus';
   if (/\b(proveedor|ofrezco|les ofrezco|les vendo|vendo|tengo para vender|distribuidor|soy proveedor)\b/.test(t)) return 'proveedor';
-  if (/\bfactur/.test(t)) return 'factura';
-  if (/\bgarant/.test(t)) return 'garantia';
-  if (/\b(guia|guias|numero de guia|rastreo|seguimiento de envio)\b/.test(t)) return 'guia';
-  if (/\b(pago|pagos|pagar|deposito|transferencia|abono|cuanto debo|saldo pendiente)\b/.test(t)) return 'pago';
+  if (isAdminRequest(text, 'factura')) return 'factura';
+  if (isAdminRequest(text, 'garantia')) return 'garantia';
+  if (isAdminRequest(text, 'guia')) return 'guia';
+  if (isAdminRequest(text, 'pago')) return 'pago';
   if (/\b(servicio|reparacion|reparación|instalar|instalacion|instalación|reparar|no enfria|no enfría|no funciona el clima|falla el clima)\b/.test(t)) return 'servicio';
   return 'refaccion';
 }
 
 function asksPrice(text) {
-  return /\b(precio|precios|cuanto cuesta|cuánto cuesta|cuanto vale|cuánto vale|que cuesta|qué cuesta|costo|cuanto sale|en cuanto)\b/.test(norm(text));
+  const t = norm(text);
+  // Solo si PIDE un precio ("¿cuánto cuesta?", "precio de..."): un aviso
+  // sobre precios ("el gas subirá de precio") no es pedirlo.
+  if (/\b(cuanto cuesta|cuanto vale|que cuesta|cuanto sale|en cuanto|cuanto es|me das precio|me puedes dar precio|me pueden dar precio|precio del?|cotiz|cuanto me sale)\b/.test(t)) return true;
+  return t.includes('precio') && text.includes('?');
 }
 
 function isFarewell(text) {
@@ -285,6 +346,11 @@ function handleMessage(conv, msg) {
   // contestar, salvo que el bot esté esperando una respuesta a su
   // propia pregunta.
   const esperaRespuesta = f._pendiente || f._pideNombre || f._pideEmpresa || f._pideNecesidad || f._pideDetalle || f._pideRefaccion;
+  // Un aviso o información (cambio de precio, cierre, calendario): es
+  // para las personas del taller, no una solicitud al bot. Silencio,
+  // salvo que el bot esté esperando una respuesta a su propia pregunta
+  // o que el mensaje traiga una foto (una foto es de la pieza o unidad).
+  if (text && !hasPhoto && !esperaRespuesta && isAnnouncement(text)) return { reply: null, solicitud: null, close: false };
   if (text && !esperaRespuesta && isAck(text)) return { reply: null, solicitud: null, close: false };
 
   // Guardar lo que el cliente pidió con sus propias palabras (p. ej.

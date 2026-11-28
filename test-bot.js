@@ -318,5 +318,51 @@ check('Héctor 2: silencio', r.reply === null, JSON.stringify(r));
 r = say(c, '?');
 check('Héctor 3: silencio', r.reply === null, JSON.stringify(r));
 
+// 16. Avisos e información (2026-11-28, casos Héctor Imconsa y David Avalos):
+// un aviso no es una solicitud: el bot se queda callado, no pregunta
+// por la pieza ni pide el nombre para una factura.
+c = conv();
+r = say(c, 'BUEN DIA PARA COMENTARLE QUE EL GAS SUBIRA DE PRECIO');
+check('aviso de subida de precio no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'EL PRECIO ANTERIOR SE RESPETA ASTA EL DIA DE HOY POR SI QWUIEREN APROBECHAR');
+check('aviso de precio anterior no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+// Secuencia de Héctor: dos avisos seguidos, cero respuestas (antes repetía la misma)
+c = conv();
+r = say(c, 'BUEN DIA PARA COMENTARLE QUE EL GAS SUBIRA DE PRECIO');
+check('Héctor aviso 1: silencio', r.reply === null, JSON.stringify(r));
+r = say(c, 'EL PRECIO ANTERIOR SE RESPETA ASTA EL DIA DE HOY POR SI QWUIEREN APROBECHAR');
+check('Héctor aviso 2: silencio, no repite', r.reply === null, JSON.stringify(r));
+
+// 16b. Aviso de calendario de Spheros (David Avalos): no es solicitud de factura
+c = conv();
+r = say(c, 'forma, con la fechas establecidas pero a los principales clientes y proveedores voy avisando de una vez para ganar el mayor tiempo posible. 1) El cierre de operaciones será el día 18/12, es decir, ese viernes aún se trabaja completo. 2) El regreso a operaciones será el 11/01/27, lunes. 3) El inventario general será del día 07/12 al 10/12, lunes a jueves, durante estos días NO HABRÁ EXCEPCIÓN, no habrá movimiento de piezas ni equipos. 4) La posada de Spheros será el día 11/12, viernes, este día no habrá labores. 5) El último día de pagos será el día 14/12, lunes. 6) El último día de recepción de facturas será el 14/12, lunes.');
+check('aviso de calendario Spheros no contesta', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'El último día de pagos será el día 14/12, lunes.');
+check('aviso de último día de pagos no pide nombre', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'El último día de recepción de facturas será el 14/12, lunes.');
+check('aviso de recepción de facturas no pide nombre', r.reply === null && !r.solicitud, JSON.stringify(r));
+
+// 16c. Un aviso con pedido sí se atiende (no se calla de más)
+c = conv();
+r = say(c, 'Les aviso que el gas subirá de precio, necesito un compresor TM65');
+check('aviso con pedido sí se atiende', r.reply && /nombre/i.test(r.reply) && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, 'Buen día, para comentarle que cerramos el 18/12, ¿me pueden mandar la factura?');
+check('aviso con pregunta de factura sí se atiende', r.reply && /nombre/i.test(r.reply) && !r.solicitud, JSON.stringify(r));
+
+// 16d. Precio: solo la pregunta pide precio; el aviso no
+c = conv();
+r = say(c, 'el gas subirá de precio');
+check('subirá de precio no es pregunta de precio', r.reply === null && !r.solicitud, JSON.stringify(r));
+c = conv();
+r = say(c, '¿Cuánto cuesta el compresor TM65?');
+check('cuánto cuesta sí es pregunta de precio (sin precio)', r.reply && !/\$\s?\d|precio|costo|cuesta/.test(r.reply.toLowerCase()), r.reply);
+c = conv();
+r = say(c, 'precio del compresor TM65');
+check('precio de pieza toma la solicitud sin dar precio', r.reply && /nombre/i.test(r.reply), r.reply);
+
 console.log(`\n${pass} pasaron, ${fail} fallaron`);
 process.exit(fail ? 1 : 0);
